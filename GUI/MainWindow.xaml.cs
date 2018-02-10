@@ -48,7 +48,7 @@ using NAudio.Wave;
 #region ADL
 using Hardcodet.Wpf.TaskbarNotification;
 using System.Drawing;
-using Form = System.Windows.Forms;
+using System.Threading;
 #endregion
 
 namespace GARbro.GUI
@@ -65,17 +65,17 @@ namespace GARbro.GUI
         const StringComparison StringIgnoreCase = StringComparison.CurrentCultureIgnoreCase;
 
         #region ADL
-
         Icon app_icon = new Icon(Application.GetResourceStream(new Uri("pack://application:,,,/images/sample.ico")).Stream);
         TaskbarIcon tray = new TaskbarIcon();
-        Form.Timer hide_timer = null;
+        Timer hide_timer = null;
         private int counter = 0;
-        private void hide_timer_Tick(object sender, EventArgs e)
+        private void hide_timer_Tick(object state)
         {
             counter--;
             if (counter == 0)
             {
-                hide_timer.Stop();
+                hide_timer.Change(Timeout.Infinite, Timeout.Infinite);
+                hide_timer.Dispose();
                 tray.HideBalloonTip();
             }
         }
@@ -90,22 +90,17 @@ namespace GARbro.GUI
             if (timeout > 0)
                 counter = timeout;
             tray.ShowBalloonTip(title, message, app_icon, true);
-            hide_timer = new Form.Timer();
-            hide_timer.Interval = 1000; //milliseconds
-            hide_timer.Tick += hide_timer_Tick;
-            hide_timer.Start();
+            hide_timer = new Timer(hide_timer_Tick);
+            hide_timer.Change(1000, 1000);
         }
 
         private void trayUpdate(string msg)
         {
             tray.ToolTipText = msg;
         }
-
 #endregion
         public MainWindow()
         {
-
-
             m_app = Application.Current as App;
             InitializeComponent();
             if (this.Top < 0) this.Top = 0;
@@ -129,7 +124,6 @@ namespace GARbro.GUI
                 }
             };
             pathLine.EnterKeyDown += acb_OnKeyDown;
-
 #region ADL
             var ico = new Icon(Application.GetResourceStream(new Uri("pack://application:,,,/images/sample.ico")).Stream);
             tray.Icon = app_icon;
