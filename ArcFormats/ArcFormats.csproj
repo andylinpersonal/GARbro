@@ -160,6 +160,7 @@
     <Compile Include="Maika\AudioWV5.cs" />
     <Compile Include="NonColor\ArcMinato.cs" />
     <Compile Include="Misc\ArcBIN.cs" />
+    <Compile Include="NUGSystem\ArcDAT.cs" />
     <Compile Include="Nekopunch\ImagePBM.cs" />
     <Compile Include="Nexas\ArcTPF.cs" />
     <Compile Include="LiveMaker\ImageGALX.cs" />
