@@ -72,7 +72,7 @@
   </PropertyGroup>
   <PropertyGroup />
   <PropertyGroup>
-    <SignManifests>true</SignManifests>
+    <SignManifests>false</SignManifests>
   </PropertyGroup>
   <PropertyGroup>
     <ApplicationManifest>Properties\app.manifest</ApplicationManifest>
@@ -159,9 +159,7 @@
     <Compile Include="GarCreate.cs" />
     <Compile Include="GarExtract.cs" />
     <Compile Include="GarOperation.cs" />
-    <Compile Include="GarUpdate.cs">
-      <SubType>Component</SubType>
-    </Compile>
+    <Compile Include="GarUpdate.cs" />
     <Compile Include="HistoryStack.cs" />
     <Compile Include="ImagePreview.cs" />
     <Compile Include="ListViewEx.cs" />
@@ -345,6 +343,7 @@ exit 0</PreBuildEvent>
     <PostBuildEvent>
     </PostBuildEvent>
   </PropertyGroup>
+  <!--
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
@@ -352,6 +351,7 @@ exit 0</PreBuildEvent>
     </PropertyGroup>
     <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
   </Target>
+  -->
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
