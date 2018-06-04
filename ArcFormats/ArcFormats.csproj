@@ -94,6 +94,7 @@
     <Compile Include="Abogado\ImageKG.cs" />
     <Compile Include="Actgs\ArcCG.cs" />
     <Compile Include="Actgs\ArcDAT.cs" />
+    <Compile Include="AdvDx\ArcPKD.cs" />
     <Compile Include="AdvScripter\ArcPAK.cs" />
     <Compile Include="AdvSys\ArcAdvSys3.cs" />
     <Compile Include="AdvSys\ImageGWD.cs" />
@@ -113,6 +114,7 @@
     <Compile Include="Antique\ArcDAT.cs" />
     <Compile Include="Antique\ImageGPD.cs" />
     <Compile Include="Aoi\ImageAGF.cs" />
+    <Compile Include="Apricot\ArcDAT.cs" />
     <Compile Include="ArcARCX.cs" />
     <Compile Include="Artemis\ArcMJA.cs" />
     <Compile Include="BeF\AudioVZY.cs" />
@@ -126,9 +128,11 @@
     <Compile Include="BlackRainbow\ArcSPPAK.cs" />
     <Compile Include="Bonk\ArcPACK.cs" />
     <Compile Include="Cadath\ArcDAF.cs" />
+    <Compile Include="Cadath\AudioVWF.cs" />
     <Compile Include="Cadath\ImageCGF.cs" />
     <Compile Include="Carriere\ArcARC.cs" />
     <Compile Include="Carriere\ImageCGD.cs" />
+    <Compile Include="Cmvs\ArcCPZ1.cs" />
     <Compile Include="Cmvs\CpzHeader.cs" />
     <Compile Include="Cmvs\HuffmanDecoder.cs" />
     <Compile Include="Crowd\ImageCRZ.cs" />
@@ -170,6 +174,7 @@
     <Compile Include="Maika\ArcBK.cs" />
     <Compile Include="Maika\ArcMIK01.cs" />
     <Compile Include="Maika\AudioWV5.cs" />
+    <Compile Include="Noesis\ArcIGA.cs" />
     <Compile Include="NonColor\ArcMinato.cs" />
     <Compile Include="Misc\ArcBIN.cs" />
     <Compile Include="Nekopunch\ImagePBM.cs" />
@@ -516,6 +521,7 @@
     <Compile Include="Tanaka\ArcWSM.cs" />
     <Compile Include="Tanaka\ImageBC.cs" />
     <Compile Include="TanukiSoft\ArcTAC.cs" />
+    <Compile Include="TanukiSoft\ImageAF.cs" />
     <Compile Include="Taskforce\ArcDAT.cs" />
     <Compile Include="TechnoBrain\AudioWAPE.cs" />
     <Compile Include="TechnoBrain\ImageIPF.cs" />
@@ -644,6 +650,7 @@
     <Compile Include="uGOS\ArcDET.cs" />
     <Compile Include="uGOS\ImageBMP.cs" />
     <Compile Include="AdvSys\ArcGR2.cs" />
+    <Compile Include="UMeSoft\ArcMGX.cs" />
     <Compile Include="UMeSoft\ArcPK.cs" />
     <Compile Include="Qlie\ArcQLIE.cs" />
     <Compile Include="RenPy\ArcRPA.cs" />
@@ -651,6 +658,7 @@
     <Compile Include="ArcSAF.cs" />
     <Compile Include="BlackCyc\ArcVPK.cs" />
     <Compile Include="Unity\ArcASSET.cs" />
+    <Compile Include="Unity\ArcSpVM.cs" />
     <Compile Include="Unity\ArcUnityFS.cs" />
     <Compile Include="Unity\Asset.cs" />
     <Compile Include="Unity\AssetReader.cs" />
