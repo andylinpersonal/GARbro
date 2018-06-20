@@ -1,8 +1,8 @@
-//! \file       AudioEOG.cs
-//! \date       Thu Jun 11 12:46:35 2015
-//! \brief      Crowd engine audio file.
+//! \file       AudioAOG.cs
+//! \date       2018 Jun 13
+//! \brief      System3 engine audio format.
 //
-// Copyright (C) 2015 by morkt
+// Copyright (C) 2018 by morkt
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to
@@ -23,34 +23,24 @@
 // IN THE SOFTWARE.
 //
 
-using System;
 using System.ComponentModel.Composition;
-using System.IO;
 
-namespace GameRes.Formats.Crowd
+namespace GameRes.Formats.Eushully
 {
     [Export(typeof(AudioFormat))]
-    public class EogAudio : AudioFormat
+    public class AogAudio : AudioFormat
     {
-        public override string         Tag { get { return "EOG"; } }
-        public override string Description { get { return "Crowd engine audio format (Ogg/Vorbis)"; } }
-        public override uint     Signature { get { return 0x004D5243; } } // 'CRM'
-
-        public EogAudio ()
-        {
-            Extensions = new string[] { "eog", "amb" };
-        }
+        public override string         Tag { get { return "AOG/SYS3"; } }
+        public override string Description { get { return "System3 engine audio format"; } }
+        public override uint     Signature { get { return 0x47474F41; } } // 'AOGG'
 
         public override SoundInput TryOpen (IBinaryStream file)
         {
-            var ogg = new StreamRegion (file.AsStream, 8);
+            var header = file.ReadHeader (0x18);
+            if (!header.AsciiEqual (0x14, "OggS"))
+                return null;
+            var ogg = new StreamRegion (file.AsStream, 0x14);
             return new OggInput (ogg);
-            // in case of exception ogg stream is left undisposed
-        }
-
-        public override void Write (SoundInput source, Stream output)
-        {
-            throw new System.NotImplementedException ("EogFormat.Write not implemenented");
         }
     }
 }
