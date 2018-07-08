@@ -1,6 +1,6 @@
-//! \file       ArcPAC.cs
-//! \date       2018 Apr 10
-//! \brief      Tigerman Project resource archive.
+//! \file       ArcBND.cs
+//! \date       2018 Jul 03
+//! \brief      Tetratech resource archive.
 //
 // Copyright (C) 2018 by morkt
 //
@@ -23,49 +23,48 @@
 // IN THE SOFTWARE.
 //
 
-using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.IO;
 
-// [020927][Tigerman Project] Hotaruko
-// [040403][Image-Works] Famires Senshi Pudding
-// [040723][Image-Works] Black Gate -Kanin no Gakuen-
+// [010309][Tetratech] Kyouiku Jisshuu 2 ~Joshikousei Maniacs~
 
-namespace GameRes.Formats.Tigerman
+namespace GameRes.Formats.Tetratech
 {
     [Export(typeof(ArchiveFormat))]
-    public class PacOpener : ArchiveFormat
+    public class BndOpener : ArchiveFormat
     {
-        public override string         Tag { get { return "PAC/TIGERMAN"; } }
-        public override string Description { get { return "Tigerman Project resource archive"; } }
+        public override string         Tag { get { return "BND/IDX"; } }
+        public override string Description { get { return "Tetratech resource archive"; } }
         public override uint     Signature { get { return 0; } }
         public override bool  IsHierarchic { get { return false; } }
         public override bool      CanWrite { get { return false; } }
 
         public override ArcFile TryOpen (ArcView file)
         {
-            if (file.View.ReadInt32 (0) != 0)
+            if (!file.Name.HasExtension (".BND"))
                 return null;
-            int count = file.View.ReadInt32 (4);
-            if (!IsSaneCount (count))
+            var idx_name = Path.ChangeExtension (file.Name, "idx");
+            if (!VFS.FileExists (idx_name))
                 return null;
-
-            uint index_offset = 0x14;
-            long base_offset = index_offset + count * 0x18;
-            var dir = new List<Entry> (count);
-            for (int i = 0; i < count; ++i)
+            using (var idx = VFS.OpenBinaryStream (idx_name))
             {
-                var name = file.View.ReadString (index_offset, 0x10);
-                var entry = FormatCatalog.Instance.Create<Entry> (name);
-                entry.Offset = file.View.ReadUInt32 (index_offset+0x10) + base_offset;
-                entry.Size   = file.View.ReadUInt32 (index_offset+0x14);
-                if (!entry.CheckPlacement (file.MaxOffset))
+                int count = (int)idx.Length / 0x18;
+                if (!IsSaneCount (count) || count * 0x18 != idx.Length)
                     return null;
-                dir.Add (entry);
-                index_offset += 0x18;
+                var dir = new List<Entry> (count);
+                for (int i = 0; i < count; ++i)
+                {
+                    var name = idx.ReadCString (0x10);
+                    var entry = FormatCatalog.Instance.Create<Entry> (name);
+                    entry.Size   = idx.ReadUInt32();
+                    entry.Offset = idx.ReadUInt32();
+                    if (!entry.CheckPlacement (file.MaxOffset))
+                        return null;
+                    dir.Add (entry);
+                }
+                return new ArcFile (file, this, dir);
             }
-            return new ArcFile (file, this, dir);
         }
     }
 }

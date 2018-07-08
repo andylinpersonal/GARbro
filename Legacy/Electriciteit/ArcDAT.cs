@@ -1,6 +1,6 @@
-//! \file       ArcPAC.cs
-//! \date       2018 Apr 10
-//! \brief      Tigerman Project resource archive.
+//! \file       ArcDAT.cs
+//! \date       2018 Jun 08
+//! \brief      Electriciteit resource archive.
 //
 // Copyright (C) 2018 by morkt
 //
@@ -28,44 +28,66 @@ using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.IO;
 
-// [020927][Tigerman Project] Hotaruko
-// [040403][Image-Works] Famires Senshi Pudding
-// [040723][Image-Works] Black Gate -Kanin no Gakuen-
+// [010511][e-Erekiteru] Silence ~Seinaru Yoru no Kane no Naka de...~
 
-namespace GameRes.Formats.Tigerman
+namespace GameRes.Formats.Electriciteit
 {
     [Export(typeof(ArchiveFormat))]
-    public class PacOpener : ArchiveFormat
+    public class DatOpener : ArchiveFormat
     {
-        public override string         Tag { get { return "PAC/TIGERMAN"; } }
-        public override string Description { get { return "Tigerman Project resource archive"; } }
+        public override string         Tag { get { return "DAT/electr"; } }
+        public override string Description { get { return "Electriciteit resource archive"; } }
         public override uint     Signature { get { return 0; } }
         public override bool  IsHierarchic { get { return false; } }
         public override bool      CanWrite { get { return false; } }
 
         public override ArcFile TryOpen (ArcView file)
         {
-            if (file.View.ReadInt32 (0) != 0)
+            if (!file.Name.HasExtension (".dat"))
                 return null;
-            int count = file.View.ReadInt32 (4);
+            int count = file.View.ReadInt32 (0);
             if (!IsSaneCount (count))
                 return null;
-
-            uint index_offset = 0x14;
-            long base_offset = index_offset + count * 0x18;
+            bool is_bitmap = Path.GetFileNameWithoutExtension (file.Name).StartsWith ("b");
+            uint index_offset = 4;
+            uint first_offset = index_offset + (uint)count * 0x2C;
             var dir = new List<Entry> (count);
             for (int i = 0; i < count; ++i)
             {
                 var name = file.View.ReadString (index_offset, 0x10);
-                var entry = FormatCatalog.Instance.Create<Entry> (name);
-                entry.Offset = file.View.ReadUInt32 (index_offset+0x10) + base_offset;
-                entry.Size   = file.View.ReadUInt32 (index_offset+0x14);
-                if (!entry.CheckPlacement (file.MaxOffset))
+                if (!IsValidEntryName (name))
                     return null;
+                var entry = FormatCatalog.Instance.Create<Entry> (name);
+                entry.Offset = file.View.ReadUInt32 (index_offset+0x24);
+                entry.Size   = file.View.ReadUInt32 (index_offset+0x28);
+                if (entry.Offset < first_offset || !entry.CheckPlacement (file.MaxOffset))
+                    return null;
+                if (is_bitmap)
+                    entry.Type = "image";
                 dir.Add (entry);
-                index_offset += 0x18;
+                index_offset += 0x2C;
             }
             return new ArcFile (file, this, dir);
         }
+
+        public override IImageDecoder OpenImage (ArcFile arc, Entry entry)
+        {
+            if (arc.File.View.ReadUInt16 (entry.Offset) != 0xB2BD) // ~'BM'
+                return base.OpenImage (arc, entry);
+            Stream input = arc.File.CreateStream (entry.Offset+2, entry.Size-2);
+            input = new PrefixStream (BitmapHeader, input);
+            var bitmap = new BinaryStream (input, entry.Name);
+            try
+            {
+                return new ImageFormatDecoder (bitmap);
+            }
+            catch
+            {
+                bitmap.Dispose();
+                throw;
+            }
+        }
+
+        static readonly byte[] BitmapHeader = new byte[] { (byte)'B', (byte)'M' };
     }
 }
