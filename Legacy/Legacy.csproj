@@ -41,8 +41,13 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <ErrorReport>prompt</ErrorReport>
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="ICSharpCode.SharpZipLib, Version=1.0.0.0, Culture=neutral, PublicKeyToken=1b03e6acf1164f73, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\SharpZipLib.1.0.0-alpha2\lib\netstandard1.3\ICSharpCode.SharpZipLib.dll</HintPath>
+    </Reference>
     <Reference Include="PresentationCore" />
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.Composition" />
@@ -56,13 +61,23 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Aaru\ArcFL3.cs" />
     <Compile Include="Aaru\ArcFL4.cs" />
+    <Compile Include="Aaru\ImageBM2.cs" />
     <Compile Include="Acme\ImageARD.cs" />
     <Compile Include="Ags32i\AudioAGS.cs" />
     <Compile Include="Ags32i\ImageGSS.cs" />
     <Compile Include="Airyu\ArcCHR.cs" />
     <Compile Include="Akatombo\ArcX.cs" />
     <Compile Include="Akatombo\ImageFB.cs" />
+    <Compile Include="Kasane\ArcAR2.cs" />
+    <Compile Include="KeroQ\ArcDAT.cs" />
+    <Compile Include="KeroQ\ImageCBM.cs" />
+    <Compile Include="KeroQ\ImageKGD.cs" />
+    <Compile Include="KeroQ\ImageKGD1.cs" />
+    <Compile Include="Melonpan\ArcTTD.cs" />
+    <Compile Include="RSystem\ArcRAD.cs" />
+    <Compile Include="RSystem\ImageRSG.cs" />
     <Compile Include="Brownie\ArcNAF.cs" />
     <Compile Include="Brownie\AudioWAV.cs" />
     <Compile Include="Discovery\ArcDAT.cs" />
@@ -81,12 +96,19 @@
     <Compile Include="Electriciteit\ArcDAT.cs" />
     <Compile Include="Eve\ArcGM.cs" />
     <Compile Include="Eve\AudioWV.cs" />
+    <Compile Include="Force\ArcPAQ.cs" />
+    <Compile Include="Force\ImageDZP.cs" />
+    <Compile Include="Gaia\ImageJPG.cs" />
     <Compile Include="GPlay\ArcYSK.cs" />
     <Compile Include="Hdl\ArcHOT.cs" />
     <Compile Include="Hdl\ImageHOT.cs" />
+    <Compile Include="Libido\ArcARC.cs" />
     <Compile Include="Logg\ArcMBM.cs" />
+    <Compile Include="MayBeSoft\ImageHHP.cs" />
     <Compile Include="Mermaid\ImageMG1.cs" />
+    <Compile Include="Mink\ImageDAT.cs" />
     <Compile Include="Muse\ArcDAT.cs" />
+    <Compile Include="Ocarina\ImageRED.cs" />
     <Compile Include="Pan\ArcPAN.cs" />
     <Compile Include="Pan\AudioNSF.cs" />
     <Compile Include="Pan\ImageTBL.cs" />
@@ -94,18 +116,28 @@
     <Compile Include="Pisckiss\Audio0.cs" />
     <Compile Include="Pisckiss\Image1.cs" />
     <Compile Include="Rune\ArcYK.cs" />
+    <Compile Include="Sarang\ImageABC.cs" />
+    <Compile Include="Sogna\ArcSGS.cs" />
+    <Compile Include="Speed\ImageDAT.cs" />
+    <Compile Include="Tako\ArcMPK.cs" />
     <Compile Include="Tetratech\ArcBND.cs" />
     <Compile Include="Tigerman\ArcCHR.cs" />
     <Compile Include="Tigerman\ArcPAC.cs" />
     <Compile Include="Tigerman\ImageCHR.cs" />
     <Compile Include="Types\ArcARC.cs" />
     <Compile Include="Types\ImageTPGF.cs" />
+    <Compile Include="Uma\ArcCDT.cs" />
+    <Compile Include="Uma\ArcSDT.cs" />
     <Compile Include="UMeSoft\AudioIKE.cs" />
     <Compile Include="UMeSoft\AudioSTR.cs" />
     <Compile Include="UMeSoft\ImageIKE.cs" />
     <Compile Include="Unknown\ArcAQA.cs" />
     <Compile Include="Unknown\AudioMSF.cs" />
     <Compile Include="Unknown\ImageCTF.cs" />
+    <Compile Include="Wing\ImageGEM.cs" />
+    <Compile Include="Witch\ArcDAT.cs" />
+    <Compile Include="Witch\ArcPCD.cs" />
+    <Compile Include="Witch\ArcVBD.cs" />
     <Compile Include="Yaneurao\ArcDAT.cs" />
     <Compile Include="Factor\ArcRES.cs" />
     <Compile Include="Gsx\ArcK3.cs" />
@@ -176,7 +208,9 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="Ark\" />
     <Folder Include="Bom\" />
+    <Folder Include="StudioJikkenshitsu\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

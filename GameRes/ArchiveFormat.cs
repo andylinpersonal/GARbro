@@ -49,7 +49,7 @@ namespace GameRes
         public void Extract (ArcFile file, Entry entry)
         {
             using (var input = OpenEntry (file, entry))
-            using (var output = CreateFile (entry.Name))
+            using (var output = PhysicalFileSystem.CreateFile (entry.Name))
                 input.CopyTo (output);
         }
 
@@ -67,49 +67,7 @@ namespace GameRes
         public virtual IImageDecoder OpenImage (ArcFile arc, Entry entry)
         {
             var input = arc.OpenBinaryEntry (entry);
-            try
-            {
-                return new ImageFormatDecoder (input);
-            }
-            catch
-            {
-                input.Dispose();
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Create file corresponding to <paramref name="entry"/> in current directory and open it
-        /// for writing. Overwrites existing file, if any.
-        /// </summary>
-        static public Stream CreateFile (string filename)
-        {
-            filename = CreatePath (filename);
-            return File.Create (filename);
-        }
-
-        static public string CreatePath (string filename)
-        {
-            string dir = Path.GetDirectoryName (filename);
-            if (!string.IsNullOrEmpty (dir)) // check for malformed filenames
-            {
-                string root = Path.GetPathRoot (dir);
-                if (!string.IsNullOrEmpty (root))
-                {
-                    dir = dir.Substring (root.Length); // strip root
-                }
-                string cwd = Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar;
-                dir = Path.GetFullPath (dir);
-                filename = Path.GetFileName (filename);
-                // check whether filename would reside within current directory
-                if (dir.StartsWith (cwd, StringComparison.OrdinalIgnoreCase))
-                {
-                    // path looks legit, create it
-                    Directory.CreateDirectory (dir);
-                    filename = Path.Combine (dir, filename);
-                }
-            }
-            return filename;
+            return ImageFormatDecoder.Create (input);
         }
 
         /// <summary>

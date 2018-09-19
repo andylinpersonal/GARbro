@@ -1,6 +1,6 @@
-//! \file       ImageMWP.cs
-//! \date       2018 Jun 18
-//! \brief      Mixwill image format.
+//! \file       ImageMCP.cs
+//! \date       2018 Feb 02
+//! \brief      Mink image format
 //
 // Copyright (C) 2018 by morkt
 //
@@ -27,37 +27,34 @@ using System.ComponentModel.Composition;
 using System.IO;
 using System.Windows.Media;
 
-// [050225][Mixwill Soft] Chibusa Byoutou
-
-namespace GameRes.Formats.Mixwill
+namespace GameRes.Formats.Mink
 {
     [Export(typeof(ImageFormat))]
-    public class MwpFormat : ImageFormat
+    public class xxxFormat : ImageFormat
     {
-        public override string         Tag { get { return "MWP"; } }
-        public override string Description { get { return "Mixwill image format"; } }
-        public override uint     Signature { get { return 0x1050574D; } } // 'MWP'
+        public override string         Tag { get { return "MCP"; } }
+        public override string Description { get { return "Mink image format"; } }
+        public override uint     Signature { get { return 0; } }
 
         public override ImageMetaData ReadMetaData (IBinaryStream file)
         {
-            var header = file.ReadHeader (12);
+            var header = file.ReadHeader (0x14);
             return new ImageMetaData {
-                Width = header.ToUInt32 (4),
-                Height = header.ToUInt32 (8),
-                BPP = 32,
-            };
+                Width  = header.ToUInt32 (8),
+                Height = header.ToUInt32 (0xC),
+                BPP    = header.ToInt32 (0x10),
         }
 
         public override ImageData Read (IBinaryStream file, ImageMetaData info)
         {
-            file.Position = 12;
-            var pixels = file.ReadBytes (4 * (int)info.Width * (int)info.Height);
-            return ImageData.Create (info, PixelFormats.Bgra32, null, pixels);
+            var meta = (xxxMetaData)info;
+
+            return ImageData.Create (info, format, palette, pixels);
         }
 
         public override void Write (Stream file, ImageData image)
         {
-            throw new System.NotImplementedException ("MwpFormat.Write not implemented");
+            throw new System.NotImplementedException ("McpFormat.Write not implemented");
         }
     }
 }
