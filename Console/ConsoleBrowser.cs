@@ -90,7 +90,7 @@ namespace GARbro
                         return;
                     }
                     var tag = args[argn+1];
-                    m_image_format = FindFormat (tag);
+                    m_image_format = ImageFormat.FindByTag (tag);
                     if (null == m_image_format)
                     {
                         Console.Error.WriteLine ("{0}: unknown format specified", tag);
@@ -135,15 +135,15 @@ namespace GARbro
                 if (args.Length > argn+1)
                 {
                     for (int i = argn+1; i < args.Length; ++i)
-                        ExtractFile (arc, args[i]);
+                        ExtractFile (arc.Source, args[i]);
                 }
                 else if (m_extract_all)
                 {
-                    ExtractAll (arc);
+                    ExtractAll (arc.Source);
                 }
                 else
                 {
-                    foreach (var entry in arc.Dir.OrderBy (e => e.Offset))
+                    foreach (var entry in arc.Source.Dir.OrderBy (e => e.Offset))
                     {
                         Console.WriteLine ("{0,9} [{2:X8}] {1}", entry.Size, entry.Name, entry.Offset);
                     }

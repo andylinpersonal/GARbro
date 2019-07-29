@@ -335,6 +335,7 @@
                         <Polygon Stroke="Black" Stretch="None" Fill="Black" Points="1,1 1,9 9,5"/>-->
                     </Button>
                 </StatusBarItem>
+        <!--endregion ADL-->
 
                 <StatusBarItem x:Name="appPlaybackControl" Visibility="Collapsed">
                     <Button Width="18" Height="18"
@@ -343,8 +344,14 @@
                         <!--ADL-->
                         <Rectangle Stretch="Fill" Fill="Black" Width="8" Height="8"/>
                     </Button>
-                </StatusBarItem>
-                <StatusBarItem>
+        </StatusBarItem>
+        <StatusBarItem x:Name="appPlaybackVolumeControl" Visibility="Collapsed">
+          <Slider x:Name="appPlaybackVolumeSubControl" Width="72" Height="18"
+                          HorizontalAlignment="Center" VerticalContentAlignment="Center"
+                          Minimum="0.0" Maximum="1.0" Value="1.0"
+                          ValueChanged="appPlaybackVolumeSubControl_OnValueChanged" />
+        </StatusBarItem>
+        <StatusBarItem>
                     <TextBlock x:Name="appResourceText"/>
                 </StatusBarItem>
             </StatusBar>
@@ -516,6 +523,172 @@
         <CommandBinding Command="{x:Static local:Commands.AudioPauseContinue}" Executed="AudioPauseContinueExec" CanExecute="CanAudioPauseContinueExec"/>
         <CommandBinding Command="{x:Static local:Commands.AudioNext}" Executed="AudioNextExec" CanExecute="CanAudioNextExec"/>
         <CommandBinding Command="{x:Static local:Commands.AudioPrevious}" Executed="AudioPreviousExec" CanExecute="CanAudioPreviousExec"/>
-
+    <!--End ADL-->
     </Window.CommandBindings>
+  <!--ADL-->
+  <Window.TaskbarItemInfo>
+    <TaskbarItemInfo x:Name="TaskbarItemInfo" Description="Garbro" ProgressState="None">
+      <TaskbarItemInfo.ThumbButtonInfos>
+
+        <ThumbButtonInfo x:Name="TaskbarPreviousAudioControl"
+                         Visibility="Collapsed"
+                         Description="Previous"
+                         Command="{x:Static local:Commands.AudioPrevious}"
+                         CommandTarget="{Binding ElementName=appPreviousAudioControl}">
+          <ThumbButtonInfo.ImageSource>
+            <DrawingImage>
+              <DrawingImage.Drawing>
+                <DrawingGroup>
+                  <DrawingGroup.Children>
+
+                    <GeometryDrawing Brush="Black">
+                      <GeometryDrawing.Pen>
+                        <Pen Brush="Black" Thickness="2"/>
+                      </GeometryDrawing.Pen>
+                      <GeometryDrawing.Geometry>
+                        <PathGeometry>
+                          <PathGeometry.Figures>
+                            <PathFigure StartPoint="9,0">
+                              <LineSegment Point="9,8" />
+                            </PathFigure>
+                          </PathGeometry.Figures>
+                        </PathGeometry>
+                      </GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+
+                    <GeometryDrawing Brush="Black">
+                      <GeometryDrawing.Pen>
+                        <Pen Brush="Black" Thickness="0" />
+                      </GeometryDrawing.Pen>
+                      <GeometryDrawing.Geometry>
+                        <PathGeometry>
+                          <PathGeometry.Figures>
+                            <PathFigure IsClosed="True" IsFilled="True" StartPoint="6,0">
+                              <PathFigure.Segments>
+                                <LineSegment Point="6,8" />
+                                <LineSegment Point="0,4" />
+                              </PathFigure.Segments>
+                            </PathFigure>
+                          </PathGeometry.Figures>
+                        </PathGeometry>
+                      </GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+                  </DrawingGroup.Children>
+                </DrawingGroup>
+              </DrawingImage.Drawing>
+            </DrawingImage>
+          </ThumbButtonInfo.ImageSource>
+        </ThumbButtonInfo>
+
+        <ThumbButtonInfo x:Name="TaskbarPlaybackControl"
+                         Visibility="Collapsed"
+                         Description="Stop"
+                         Command="{x:Static local:Commands.AudioStopAll}"
+                         CommandTarget="{Binding ElementName=appPlaybackControl}">
+          <ThumbButtonInfo.ImageSource>
+            <DrawingImage>
+              <DrawingImage.Drawing>
+                <DrawingGroup>
+                  <DrawingGroup.Children>
+                    <GeometryDrawing Brush="Black">
+                      <GeometryDrawing.Pen>
+                        <Pen Brush="Black" Thickness="1" />
+                      </GeometryDrawing.Pen>
+                      <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="0, 0, 8, 8"/>
+                      </GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+                  </DrawingGroup.Children>
+                </DrawingGroup>
+              </DrawingImage.Drawing>
+            </DrawingImage>
+          </ThumbButtonInfo.ImageSource>
+        </ThumbButtonInfo>
+
+        <ThumbButtonInfo x:Name="TaskbarPauseAudioControl"
+                         Visibility="Collapsed"
+                         Description="Pause"
+                         Command="{x:Static local:Commands.AudioPauseContinue}"
+                         CommandTarget="{Binding ElementName=appPauseAudioControl}">
+          <ThumbButtonInfo.ImageSource>
+            <DrawingImage>
+              <DrawingImage.Drawing>
+                <DrawingGroup>
+                  <DrawingGroup.Children>
+                    <GeometryDrawing Brush="Black">
+                      <GeometryDrawing.Pen>
+                        <Pen Brush="Black" Thickness="2" />
+                      </GeometryDrawing.Pen>
+                      <GeometryDrawing.Geometry>
+                        <PathGeometry>
+                          <PathFigure StartPoint="2,0">
+                            <LineSegment Point="2,8" />
+                          </PathFigure>
+                          <PathFigure StartPoint="8,0">
+                            <LineSegment Point="8,8" />
+                          </PathFigure>
+                        </PathGeometry>
+                      </GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+                  </DrawingGroup.Children>
+                </DrawingGroup>
+              </DrawingImage.Drawing>
+            </DrawingImage>
+          </ThumbButtonInfo.ImageSource>
+        </ThumbButtonInfo>
+
+
+        <ThumbButtonInfo x:Name="TaskbarNextAudioControl"
+                         Visibility="Collapsed"
+                         Description="Next"
+                         Command="{x:Static local:Commands.AudioNext}"
+                         CommandTarget="{Binding ElementName=appNextAudioControl}">
+          <ThumbButtonInfo.ImageSource>
+            <DrawingImage>
+              <DrawingImage.Drawing>
+                <DrawingGroup>
+                  <DrawingGroup.Children>
+
+                    <GeometryDrawing Brush="Black">
+                      <GeometryDrawing.Pen>
+                        <Pen Brush="Black" Thickness="2"/>
+                      </GeometryDrawing.Pen>
+                      <GeometryDrawing.Geometry>
+                        <PathGeometry>
+                          <PathGeometry.Figures>
+                            <PathFigure StartPoint="0,0">
+                              <LineSegment Point="0,8" />
+                            </PathFigure>
+                          </PathGeometry.Figures>
+                        </PathGeometry>
+                      </GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+
+                    <GeometryDrawing Brush="Black">
+                      <GeometryDrawing.Pen>
+                        <Pen Brush="Black" Thickness="0" />
+                      </GeometryDrawing.Pen>
+                      <GeometryDrawing.Geometry>
+                        <PathGeometry>
+                          <PathGeometry.Figures>
+                            <PathFigure IsClosed="True" IsFilled="True" StartPoint="3,0">
+                              <PathFigure.Segments>
+                                <LineSegment Point="3,8" />
+                                <LineSegment Point="9,4" />
+                              </PathFigure.Segments>
+                            </PathFigure>
+                          </PathGeometry.Figures>
+                        </PathGeometry>
+                      </GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+                  </DrawingGroup.Children>
+                </DrawingGroup>
+              </DrawingImage.Drawing>
+            </DrawingImage>
+          </ThumbButtonInfo.ImageSource>
+        </ThumbButtonInfo>
+      </TaskbarItemInfo.ThumbButtonInfos>
+    </TaskbarItemInfo>
+  </Window.TaskbarItemInfo>
+  <!--End ADL-->
 </Window>

@@ -45,12 +45,6 @@ using Rnd.Windows;
 using Microsoft.Win32;
 using NAudio.Wave;
 
-#region ADL
-using Hardcodet.Wpf.TaskbarNotification;
-using System.Drawing;
-using System.Threading;
-#endregion
-
 namespace GARbro.GUI
 {
     /// <summary>
@@ -67,6 +61,7 @@ namespace GARbro.GUI
         const StringComparison StringIgnoreCase = StringComparison.CurrentCultureIgnoreCase;
 
         #region ADL
+		/*
         Icon app_icon = new Icon(Application.GetResourceStream(new Uri("pack://application:,,,/images/sample.ico")).Stream);
         TaskbarIcon tray = new TaskbarIcon();
         Timer hide_timer = null;
@@ -99,7 +94,7 @@ namespace GARbro.GUI
         private void trayUpdate(string msg)
         {
             tray.ToolTipText = msg;
-        }
+        }*/
 #endregion
         public MainWindow()
         {
@@ -128,9 +123,9 @@ namespace GARbro.GUI
             DownScaleImage.PropertyChanged += (s, e) => ApplyDownScaleSetting();
             pathLine.EnterKeyDown += acb_OnKeyDown;
 #region ADL
-            var ico = new Icon(Application.GetResourceStream(new Uri("pack://application:,,,/images/sample.ico")).Stream);
-            tray.Icon = app_icon;
-            tray.ToolTipText = guiStrings.MsgRunning;
+            //var ico = new Icon(Application.GetResourceStream(new Uri("pack://application:,,,/images/sample.ico")).Stream);
+            //tray.Icon = app_icon;
+            //tray.ToolTipText = guiStrings.MsgRunning;
             // Init member
 
             {
@@ -1072,7 +1067,7 @@ namespace GARbro.GUI
             }
         }
 
-#region ADL_PLAYBACK
+#region ADL
         List<Entry> AudioFileList = new List<Entry>();
         bool isAudioLoop = false;
         int CurrentAudioFileListIdx = 0;
@@ -1203,12 +1198,12 @@ namespace GARbro.GUI
             {
                 if (AudioDevice.PlaybackState == PlaybackState.Paused)
                 {
-                    trayUpdate(String.Format(guiStrings.MsgNowPlaying, AudioFileList[CurrentAudioFileListIdx].Name));
+                    //trayUpdate(String.Format(guiStrings.MsgNowPlaying, AudioFileList[CurrentAudioFileListIdx].Name));
                     AudioDevice.Play();
                 }
                 else if (AudioDevice.PlaybackState == PlaybackState.Playing)
                 {
-                    trayUpdate(String.Format(guiStrings.MsgPaused, AudioFileList[CurrentAudioFileListIdx].Name));
+                    //trayUpdate(String.Format(guiStrings.MsgPaused, AudioFileList[CurrentAudioFileListIdx].Name));
                     AudioDevice.Pause();
                 }
                 SetAppPauseControlIcon();
@@ -1223,7 +1218,12 @@ namespace GARbro.GUI
             else e.CanExecute = false;
         }
 
-
+        private void appPlaybackVolumeSubControl_OnValueChanged(object control, RoutedEventArgs e)
+        {
+            Slider ctrl = (Slider) e.OriginalSource;
+            if (AudioDevice != null)
+                AudioDevice.Volume = (float)ctrl.Value;
+        }
 #endregion
 
         private void PlayFile (Entry entry)
@@ -1260,23 +1260,29 @@ namespace GARbro.GUI
                 AudioDevice.Play();
 
 #region ADL
+                appPlaybackVolumeControl.Visibility = Visibility.Visible;
+                
                 if (AudioFileList.Count == 0)
                     AudioFileList.Add(entry);
                 appPauseAudioControl.Visibility = Visibility.Visible;
+                TaskbarPauseAudioControl.Visibility = Visibility.Visible;
                 SetAppPauseControlIcon();
 
                 //this.app_notify_icon.ShowBalloonTip(2000, "Now playing:", entry.Name, Form.ToolTipIcon.Info);
-                trayShowBalloonTip(
+                /*trayShowBalloonTip(
                     4,
                     guiStrings.MsgNowPlaying.Replace("{0}", ""),
                     String.Format(guiStrings.MsgNowPlaying, entry.Name)
-                    );
-                trayUpdate(String.Format(guiStrings.MsgNowPlaying, entry.Name));
+                    );*/
+                //trayUpdate(String.Format(guiStrings.MsgNowPlaying, entry.Name));
                 if (AudioFileList.Count > 1)
                 {
                     appNextAudioControl.Visibility = Visibility.Visible;
                     appPreviousAudioControl.Visibility = Visibility.Visible;
+                    TaskbarNextAudioControl.Visibility = Visibility.Visible;
+                    TaskbarPreviousAudioControl.Visibility = Visibility.Visible;
                 }
+                TaskbarPlaybackControl.Visibility = Visibility.Visible;
 #endregion
 
                 appPlaybackControl.Visibility = Visibility.Visible;
@@ -1314,7 +1320,7 @@ namespace GARbro.GUI
                 appPlaybackControl.Visibility = Visibility.Collapsed;
 
 #region ADL
-                trayUpdate("");
+                //trayUpdate("");
                 if (AudioFileList.Count > 0 && AudioFileList.Count > ++CurrentAudioFileListIdx)
                 {
                     PlayFile(AudioFileList[CurrentAudioFileListIdx]);
@@ -1328,15 +1334,23 @@ namespace GARbro.GUI
                     }
                     else
                     {
-                        appPauseAudioControl.Visibility = Visibility.Collapsed;
-                        appNextAudioControl.Visibility = Visibility.Collapsed;
-                        appPreviousAudioControl.Visibility = Visibility.Collapsed;
+                        // Hide all controls
+                        {
+                            appPauseAudioControl.Visibility = Visibility.Collapsed;
+                            appNextAudioControl.Visibility = Visibility.Collapsed;
+                            appPreviousAudioControl.Visibility = Visibility.Collapsed;
+                            appPlaybackVolumeControl.Visibility = Visibility.Collapsed;
+
+                            TaskbarNextAudioControl.Visibility = Visibility.Collapsed;
+                            TaskbarPauseAudioControl.Visibility = Visibility.Collapsed;
+                            TaskbarPlaybackControl.Visibility = Visibility.Collapsed;
+                            TaskbarPreviousAudioControl.Visibility = Visibility.Collapsed;
+                        }
                         AudioFileList.Clear();
-                        trayUpdate(guiStrings.MsgRunning);
+                        //trayUpdate(guiStrings.MsgRunning);
                     }
                 }
 #endregion
-
             }
             catch (Exception X)
             {
@@ -1783,11 +1797,6 @@ namespace GARbro.GUI
             {
                 Trace.WriteLine (X.Message, "Drop event failed");
             }
-        }
-
-        private void CommandBinding_Executed(object sender, ExecutedRoutedEventArgs e)
-        {
-
         }
     }
 

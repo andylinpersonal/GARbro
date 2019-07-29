@@ -557,15 +557,6 @@ Overwrite?</value>
   <data name="CtxMenuAudioStopAll" xml:space="preserve">
     <value>Stop playing...</value>
   </data>
-  <data name="MsgNowPlaying" xml:space="preserve">
-    <value>Now Playing: {0}</value>
-  </data>
-  <data name="MsgPaused" xml:space="preserve">
-    <value>Paused: {0}</value>
-  </data>
-  <data name="MsgRunning" xml:space="preserve">
-    <value>GARBro is running...</value>
-  </data>
   <data name="TextViewer" xml:space="preserve">
     <value>Image viewer</value>
   </data>
