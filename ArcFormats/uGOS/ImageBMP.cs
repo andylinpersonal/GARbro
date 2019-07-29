@@ -46,7 +46,7 @@ namespace GameRes.Formats.uGOS
         public DetBmpFormat ()
         {
             Extensions = new string[] { "bmp" };
-            Signatures = new uint[] { 0x206546, 0x186546, 0x086546, 0x01186446, 0x186446, 0 };
+            Signatures = new uint[] { 0x206546, 0x186546, 0x086546, 0 };
         }
 
         public override ImageMetaData ReadMetaData (IBinaryStream stream)
@@ -55,7 +55,7 @@ namespace GameRes.Formats.uGOS
             if (header[0] != 'F')
                 return null;
             var type = header[1] & 0x5F;
-            if (type != 'D' && type != 'E')
+            if (type != 'E')
                 return null;
             int bpp = header[2];
             if (bpp != 8 && bpp != 0x18 && bpp != 0x20)
@@ -71,11 +71,9 @@ namespace GameRes.Formats.uGOS
 
         public override ImageData Read (IBinaryStream file, ImageMetaData info)
         {
-            using (var reader = new Reader (file, (DetBmpMetaData)info))
-            {
-                reader.Unpack();
-                return ImageData.CreateFlipped (info, reader.Format, null, reader.Data, reader.Stride);
-            }
+            var reader = new Reader (file, (DetBmpMetaData)info);
+            reader.Unpack();
+            return ImageData.CreateFlipped (info, reader.Format, null, reader.Data, reader.Stride);
         }
 
         public override void Write (Stream file, ImageData image)
@@ -83,7 +81,7 @@ namespace GameRes.Formats.uGOS
             throw new System.NotImplementedException ("DetBmpFormat.Write not implemented");
         }
 
-        internal sealed class Reader : IDisposable
+        internal sealed class Reader
         {
             IBinaryStream   m_input;
             byte[]          m_output;
@@ -451,12 +449,6 @@ namespace GameRes.Formats.uGOS
                     dword_4CB750[i] = OffsetsX[i] + m_width * OffsetsY[i];
                 }
             }
-
-            #region IDisposable Members
-            public void Dispose ()
-            {
-            }
-            #endregion
         }
     }
 }

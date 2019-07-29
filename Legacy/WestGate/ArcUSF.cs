@@ -28,9 +28,7 @@ using System.ComponentModel.Composition;
 
 namespace GameRes.Formats.WestGate
 {
-#if DEBUG
     [Export(typeof(ArchiveFormat))]
-#endif
     public class UsfOpener : ArchiveFormat
     {
         public override string         Tag { get { return "USF"; } }
@@ -41,7 +39,7 @@ namespace GameRes.Formats.WestGate
 
         public UsfOpener ()
         {
-            Extensions = new string[] { "alh", "usf", "udc", "uwb" };
+            Extensions = new string[] { "alh", "usf", "udc", "uwb", "arc" };
         }
 
         public override ArcFile TryOpen (ArcView file)

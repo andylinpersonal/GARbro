@@ -2,7 +2,7 @@
 //! \date       Thu Oct 08 00:18:56 2015
 //! \brief      DxLib engine archives with 'DX' signature.
 //
-// Copyright (C) 2015-2017 by morkt
+// Copyright (C) 2015-2018 by morkt
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to
@@ -26,8 +26,8 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
+using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Text;
 using GameRes.Utility;
 
@@ -35,13 +35,13 @@ namespace GameRes.Formats.DxLib
 {
     internal class DxArchive : ArcFile
     {
-        public readonly byte[] Key;
+        public readonly IDxKey Encryption;
         public readonly int Version;
 
-        public DxArchive (ArcView arc, ArchiveFormat impl, ICollection<Entry> dir, byte[] key, int version)
+        public DxArchive (ArcView arc, ArchiveFormat impl, ICollection<Entry> dir, IDxKey enc, int version)
             : base (arc, impl, dir)
         {
-            Key = key;
+            Encryption = enc;
             Version = version;
         }
     }
@@ -49,7 +49,7 @@ namespace GameRes.Formats.DxLib
     [Serializable]
     public class DxScheme : ResourceScheme
     {
-        public IList<byte[]> KnownKeys;
+        public IList<IDxKey> KnownKeys;
     }
 
     [Export(typeof(ArchiveFormat))]
@@ -63,46 +63,66 @@ namespace GameRes.Formats.DxLib
 
         public DxOpener ()
         {
-            Extensions = new string[] { "dxa", "hud", "usi", "med", "dat", "bin" };
-            Signatures = new uint[] { 0x19EF8ED4, 0xA9FCCEDD, 0x0AEE0FD3, 0x5523F211, 0x5524F211, 0x69FC5FE4, 0 };
+            Extensions = new string[] { "dxa", "hud", "usi", "med", "dat", "bin", "bcx", "wolf" };
+            Signatures = new uint[] {
+                0x19EF8ED4, 0xA9FCCEDD, 0x0AEE0FD3, 0x5523F211, 0x5524F211, 0x69FC5FE4, 0x09E19ED9, 0x7DCC5D83,
+                0xC55D4473, 0
+            };
         }
 
-        public static IList<byte[]> KnownKeys = new List<byte[]>();
+        DxScheme DefaultScheme = new DxScheme { KnownKeys = new List<IDxKey>() };
+
+        public IList<IDxKey> KnownKeys { get { return DefaultScheme.KnownKeys; } }
 
         public override ArcFile TryOpen (ArcView file)
         {
             if (file.MaxOffset < 0x1C)
                 return null;
             uint signature = file.View.ReadUInt32 (0);
-            foreach (var key in KnownKeys)
+            foreach (var enc in KnownKeys)
             {
+                var key = enc.Key;
                 uint sig_key = LittleEndian.ToUInt32 (key, 0);
                 uint sig_test = signature ^ sig_key;
                 int version = (int)(sig_test >> 16);
-                if (0x5844 == (sig_test & 0xFFFF) && version <= 6) // 'DX'
+                if (0x5844 == (sig_test & 0xFFFF) && version <= 7) // 'DX'
                 {
                     var dir = ReadIndex (file, version, key);
                     if (null != dir)
                     {
-                        if (KnownKeys[0] != key)
+                        if (KnownKeys[0] != enc)
                         {
                             // move last used key to the top of the known keys list
-                            KnownKeys.Remove (key);
-                            KnownKeys.Insert (0, key);
+                            KnownKeys.Remove (enc);
+                            KnownKeys.Insert (0, enc);
                         }
-                        return new DxArchive (file, this, dir, key, version);
+                        return new DxArchive (file, this, dir, enc, version);
                     }
                     return null;
                 }
             }
-            return GuessKey (file);
+            var arc = GuessKey (file);
+            if (arc != null)
+            {
+                var encryption = arc.Encryption;
+                KnownKeys.Insert (0, encryption);
+                Trace.WriteLine (string.Format ("Restored key '{0}'", encryption.Password, "[DXA]"));
+            }
+            return arc;
         }
 
-        ArcFile GuessKey (ArcView file)
+        DxArchive GuessKey (ArcView file)
         {
             if (file.MaxOffset > uint.MaxValue)
                 return null;
-            var key = new byte[12];
+            var key = GuessKeyV6 (file);
+            if (key != null)
+            {
+                var dir = ReadIndex (file, 6, key);
+                if (dir != null)
+                    return new DxArchive (file, this, dir, new DxKey (key), 6);
+            }
+            key = new byte[12];
             for (short version = 4; version >= 1; --version)
             {
                 file.View.Read (0, key, 0, 12);
@@ -125,14 +145,34 @@ namespace GameRes.Formats.DxLib
                 {
                     var dir = ReadIndex (file, version, key);
                     if (null != dir)
-                    {
-                        KnownKeys.Insert (0, key);
-                        return new DxArchive (file, this, dir, key, version);
-                    }
+                        return new DxArchive (file, this, dir, new DxKey (key), version);
                 }
                 catch { /* ignore parse errors */ }
             }
             return null;
+        }
+
+        byte[] GuessKeyV6 (ArcView file)
+        {
+            var header = file.View.ReadBytes (0, 0x30);
+            header[0] ^= (byte)'D'; 
+            header[1] ^= (byte)'X';
+            header[2] ^= 6;
+            uint key0 = header.ToUInt32 (0);
+            header[8] ^= (byte)0x30;
+            uint data_offset_hi = header.ToUInt32 (12) ^ key0;
+            if (data_offset_hi != 0)
+                return null;
+            uint key2 = header.ToUInt32 (8);
+            uint key1 = header.ToUInt32 (0x1C);
+            long index_offset = header.ToInt64 (0x10) ^ key1 ^ ((long)key2 << 32);
+            if (index_offset <= 0x30 || index_offset >= file.MaxOffset)
+                return null;
+            var key = new byte[12];
+            LittleEndian.Pack (key0, key, 0);
+            LittleEndian.Pack (key1, key, 4);
+            LittleEndian.Pack (key2, key, 8);
+            return key;
         }
 
         public override Stream OpenEntry (ArcFile arc, Entry entry)
@@ -147,7 +187,8 @@ namespace GameRes.Formats.DxLib
             {
                 dec_offset = dx_ent.UnpackedSize;
             }
-            input = new EncryptedStream (input, dec_offset, dx_arc.Key);
+            var key = dx_arc.Encryption.GetEntryKey (dx_ent.Name);
+            input = new EncryptedStream (input, dec_offset, key);
             if (!dx_ent.IsPacked)
                 return input;
             using (input)
@@ -226,12 +267,12 @@ namespace GameRes.Formats.DxLib
             DxHeader dx = null;
             if (version <= 4)
                 dx = ReadArcHeaderV4 (file, version, key);
-            else if (6 == version)
+            else if (version >= 6)
                 dx = ReadArcHeaderV6 (file, version, key);
             if (null == dx || dx.DirTable >= dx.IndexSize || dx.FileTable >= dx.IndexSize)
                 return null;
             using (var encrypted = file.CreateStream (dx.IndexOffset, dx.IndexSize))
-            using (var index = new EncryptedStream (encrypted, 6 == version ? 0 : dx.IndexOffset, key))
+            using (var index = new EncryptedStream (encrypted, version >= 6 ? 0 : dx.IndexOffset, key))
             using (var reader = IndexReader.Create (dx, version, index))
             {
                 return reader.Read();
@@ -281,40 +322,10 @@ namespace GameRes.Formats.DxLib
             }
         }
 
-        public static byte[] CreateKey (string keyword)
-        {
-            byte[] key;
-            if (string.IsNullOrEmpty (keyword))
-            {
-                key = Enumerable.Repeat<byte> (0xAA, 12).ToArray();
-            }
-            else
-            {
-                key = new byte[12];
-                int char_count = Math.Min (keyword.Length, 12);
-                int length = Encodings.cp932.GetBytes (keyword, 0, char_count, key, 0);
-                if (length < 12)
-                    Binary.CopyOverlapped (key, 0, length, 12-length);
-            }
-            key[0] ^= 0xFF;
-            key[1]  = Binary.RotByteR (key[1], 4);
-            key[2] ^= 0x8A;
-            key[3]  = (byte)~Binary.RotByteR (key[3], 4);
-            key[4] ^= 0xFF;
-            key[5] ^= 0xAC;
-            key[6] ^= 0xFF;
-            key[7]  = (byte)~Binary.RotByteR (key[7], 3);
-            key[8]  = Binary.RotByteL (key[8], 3);
-            key[9] ^= 0x7F;
-            key[10] = (byte)(Binary.RotByteR (key[10], 4) ^ 0xD6);
-            key[11] ^= 0xCC;
-            return key;
-        }
-
         public override ResourceScheme Scheme
         {
-            get { return new DxScheme { KnownKeys = KnownKeys }; }
-            set { KnownKeys = ((DxScheme)value).KnownKeys; }
+            get { return DefaultScheme; }
+            set { DefaultScheme = (DxScheme)value; }
         }
     }
 
@@ -336,6 +347,8 @@ namespace GameRes.Formats.DxLib
         protected Encoding      m_encoding;
         protected List<Entry>   m_dir = new List<Entry>();
 
+        internal int Version { get { return m_version; } }
+
         protected IndexReader (DxHeader header, int version, Stream input)
         {
             m_header = header;
@@ -348,7 +361,7 @@ namespace GameRes.Formats.DxLib
         {
             if (version <= 4)
                 return new IndexReaderV2 (header, version, input);
-            else if (6 == version)
+            else if (version >= 6)
                 return new IndexReaderV6 (header, version, input);
             else
                 throw new InvalidFormatException ("Not supported DX archive version.");
@@ -389,7 +402,7 @@ namespace GameRes.Formats.DxLib
 
         public IndexReaderV2 (DxHeader header, int version, Stream input) : base (header, version, input)
         {
-            m_entry_size = m_version >= 2 ? 0x2C : 0x28;
+            m_entry_size = Version >= 2 ? 0x2C : 0x28;
         }
 
         private class DxDirectory
@@ -437,7 +450,7 @@ namespace GameRes.Formats.DxLib
                 {
                     uint size = m_input.ReadUInt32();
                     int packed_size = -1;
-                    if (m_version >= 2)
+                    if (Version >= 2)
                         packed_size = m_input.ReadInt32();
                     var entry = FormatCatalog.Instance.Create<PackedEntry> (Path.Combine (root, ExtractFileName (name_offset)));
                     entry.Offset = m_header.BaseOffset + offset;

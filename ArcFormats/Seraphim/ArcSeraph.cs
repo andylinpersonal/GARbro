@@ -89,9 +89,9 @@ namespace GameRes.Formats.Seraphim
             if (file.MaxOffset > uint.MaxValue
                 || !VFS.IsPathEqualsToFileName (file.Name, "ArchPac.dat"))
                 return null;
-            foreach (var scheme in KnownSchemes.Values.Where (s => s.IndexOffset < file.MaxOffset))
+            foreach (var scheme in KnownSchemes.Values.Where (s => s.IndexOffset < file.MaxOffset).OrderBy (s => s.IndexOffset))
             {
-                var dir = ReadIndex (file, scheme);
+                var dir = ReadIndex (file, scheme.IndexOffset, file.MaxOffset);
                 if (dir != null)
                 {
                     if (scheme.EventMap != null)
@@ -100,19 +100,29 @@ namespace GameRes.Formats.Seraphim
                         return new ArcFile (file, this, dir);
                 }
             }
+            var scnpac_name = VFS.ChangeFileName (file.Name, "ScnPac.dat");
+            if (!VFS.FileExists (scnpac_name))
+                return null;
+            using (var scnpac = VFS.OpenView (scnpac_name))
+            {
+                uint first_offset = scnpac.View.ReadUInt32 (4);
+                uint index_offset = scnpac.View.ReadUInt32 (first_offset-4);
+                var dir = ReadIndex (scnpac, index_offset, file.MaxOffset);
+                if (dir != null)
+                    return new ArcFile (file, this, dir);
+            }
             return null;
         }
 
         // 3 @ ScnPac.Dat : FF 18 05 XX XX XX XX
         //                  FF 16 05 XX XX XX XX
 
-        List<Entry> ReadIndex (ArcView file, ArchPacScheme scheme)
+        List<Entry> ReadIndex (ArcView file, long index_offset, long max_offset)
         {
-            long index_offset = scheme.IndexOffset;
             int base_count = file.View.ReadInt32 (index_offset);
             int file_count = file.View.ReadInt32 (index_offset + 4);
             index_offset += 8;
-            if (base_count <= 0 || base_count > 0x100 || !IsSaneCount (file_count))
+            if (base_count <= 0 || base_count > 0x40 || !IsSaneCount (file_count))
                 return null;
             var base_offsets = new List<Tuple<uint, int>> (base_count);
             int total_count = 0;
@@ -120,7 +130,7 @@ namespace GameRes.Formats.Seraphim
             {
                 uint offset = file.View.ReadUInt32 (index_offset);
                 int count = file.View.ReadInt32 (index_offset+4);
-                if (count <= 0 || count > file_count || offset > file.MaxOffset)
+                if (count <= 0 || count > file_count || offset > max_offset)
                     return null;
                 total_count += count;
                 if (total_count > file_count)
@@ -150,7 +160,7 @@ namespace GameRes.Formats.Seraphim
                         return null;
                     entry.Size = (uint)(next_offset - entry.Offset);
                     entry.Offset += base_offsets[j].Item1;
-                    if (!entry.CheckPlacement (file.MaxOffset))
+                    if (!entry.CheckPlacement (max_offset))
                         return null;
                     if (entry.Size > 0)
                         dir.Add (entry);
@@ -166,12 +176,17 @@ namespace GameRes.Formats.Seraphim
             if (0 == entry.Size)
                 return Stream.Null;
             var input = arc.File.CreateStream (entry.Offset, entry.Size);
-            if (!(entry is PackedEntry))
+            var pent = entry as PackedEntry;
+            if (null == pent)
                 return input;
             if (0x9C78 == (input.Signature & 0xFFFF))
+            {
+                pent.IsPacked = true;
                 return new ZLibStream (input, CompressionMode.Decompress);
+            }
             if (1 == input.Signature && arc.File.View.ReadByte (entry.Offset+4) == 0x78)
             {
+                pent.IsPacked = true;
                 input.Position = 4;
                 return new ZLibStream (input, CompressionMode.Decompress);
             }

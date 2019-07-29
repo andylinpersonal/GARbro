@@ -24,6 +24,7 @@
 //
 
 using System;
+using System.Collections;
 using System.IO;
 using System.Windows.Media;
 using GameRes.Formats.DirectDraw;
@@ -63,7 +64,7 @@ namespace GameRes.Formats.Unity
         public int      m_TextureDimension;
         public int      m_FilterMode;
         public int      m_Aniso;
-        public int      m_MipBias;
+        public float    m_MipBias;
         public int      m_WrapMode;
         public int      m_LightFormat;
         public int      m_ColorSpace;
@@ -89,9 +90,42 @@ namespace GameRes.Formats.Unity
             m_TextureDimension = reader.ReadInt32();
             m_FilterMode = reader.ReadInt32();
             m_Aniso = reader.ReadInt32();
-            m_MipBias = reader.ReadInt32();
+            m_MipBias = reader.ReadFloat();
             m_WrapMode = reader.ReadInt32();
             m_LightFormat = reader.ReadInt32();
+            m_ColorSpace = reader.ReadInt32();
+            m_DataLength = reader.ReadInt32();
+        }
+
+        public void Load (AssetReader reader, string version)
+        {
+            if (version != "2017.3.1f1")
+            {
+                Load (reader);
+                if (0 == m_DataLength && version.StartsWith ("2017.")) // "2017.2.0f3" || "2017.1.1p1"
+                    reader.ReadInt64();
+                return;
+            }
+            m_Name = reader.ReadString();
+            reader.Align();
+            reader.ReadInt32(); // m_ForcedFallbackFormat
+            reader.ReadInt32(); // m_DownscaleFallback
+            m_Width = reader.ReadInt32();
+            m_Height = reader.ReadInt32();
+            m_CompleteImageSize = reader.ReadInt32();
+            m_TextureFormat = (TextureFormat)reader.ReadInt32();
+            m_MipCount = reader.ReadInt32();
+            m_IsReadable = reader.ReadBool();
+            reader.Align();
+            m_ImageCount = reader.ReadInt32();
+            m_TextureDimension = reader.ReadInt32();
+            m_FilterMode = reader.ReadInt32();
+            m_Aniso = reader.ReadInt32();
+            m_MipBias = reader.ReadFloat();
+            m_WrapMode = reader.ReadInt32(); // m_WrapU
+            reader.ReadInt32(); // m_WrapV
+            reader.ReadInt32(); // m_WrapW
+            reader.ReadInt32(); // m_LightmapFormat 
             m_ColorSpace = reader.ReadInt32();
             m_DataLength = reader.ReadInt32();
         }
@@ -99,6 +133,20 @@ namespace GameRes.Formats.Unity
         public void LoadData (AssetReader reader)
         {
             m_Data = reader.ReadBytes (m_DataLength);
+        }
+
+        public void Import (IDictionary fields)
+        {
+            m_Name = fields["m_Name"] as string ?? "";
+            m_Width = (int)(fields["m_Width"] ?? 0);
+            m_Height = (int)(fields["m_Height"] ?? 0);
+            m_CompleteImageSize = (int)(fields["m_CompleteImageSize"] ?? 0);
+            m_TextureFormat = (TextureFormat)(fields["m_TextureFormat"] ?? 0);
+            m_MipCount = (int)(fields["m_MipCount"] ?? 0);
+            m_ImageCount = (int)(fields["m_ImageCount"] ?? 0);
+            m_TextureDimension = (int)(fields["m_TextureDimension"] ?? 0);
+            m_IsReadable = (bool)(fields["m_IsReadable"] ?? false);
+            m_Data = fields["image data"] as byte[] ?? Array.Empty<byte>();
         }
     }
 
@@ -112,15 +160,7 @@ namespace GameRes.Formats.Unity
         public ImageFormat SourceFormat { get { return null; } }
         public PixelFormat       Format { get; private set; }
         public ImageMetaData       Info { get; private set; }
-        public ImageData Image {
-            get {
-                if (null == m_image)
-                {
-                    m_image = Unpack();
-                }
-                return m_image;
-            }
-        }
+        public ImageData          Image { get { return m_image ?? (m_image = Unpack()); } }
 
         public Texture2DDecoder (Texture2D texture, AssetReader input)
         {
@@ -166,7 +206,8 @@ namespace GameRes.Formats.Unity
 
         ImageData Unpack ()
         {
-            m_texture.LoadData (m_reader);
+            if (null == m_texture.m_Data || 0 == m_texture.m_Data.Length)
+                m_texture.LoadData (m_reader);
             byte[] pixels;
             switch (m_texture.m_TextureFormat)
             {
@@ -255,4 +296,32 @@ namespace GameRes.Formats.Unity
             }
         }
     }
+    /*
+--- Texture2D --- 2017.3.1f1 ---
+    string  m_Name
+    int     m_ForcedFallbackFormat
+    int     m_DownscaleFallback
+    int     m_Width
+    int     m_Height
+    int     m_CompleteImageSize
+    int     m_TextureFormat
+    int     m_MipCount
+    bool    m_IsReadable
+    int     m_ImageCount
+    int     m_TextureDimension
+    GLTextureSettings   m_TextureSettings // sizeof = 0x18
+        int     m_FilterMode
+        int     m_Aniso
+        float   m_MipBias
+        int     m_WrapU
+        int     m_WrapV
+        int     m_WrapW
+    int     m_LightmapFormat
+    int     m_ColorSpace
+    byte[]      image data // int + byte[]
+    StreamingInfo   m_StreamData
+        uint    offset
+        uint    size
+        string  path
+    */
 }

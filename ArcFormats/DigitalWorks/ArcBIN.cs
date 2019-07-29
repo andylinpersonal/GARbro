@@ -72,6 +72,11 @@ namespace GameRes.Formats.DigitalWorks
         public override bool  IsHierarchic { get { return false; } }
         public override bool      CanWrite { get { return false; } }
 
+        public BinOpener ()
+        {
+            ContainedFormats = new[] { "TX", "OGG", "SCR" };
+        }
+
         public override ArcFile TryOpen (ArcView file)
         {
             if (!file.Name.HasAnyOfExtensions ("bin", "pac"))
@@ -85,7 +90,7 @@ namespace GameRes.Formats.DigitalWorks
                 Offset = e.Offset,
                 Size = e.Size,
             } as Entry).ToList();
-            dir.ForEach (e => e.Type = FormatCatalog.Instance.GetTypeFromName (e.Name));
+            dir.ForEach (e => e.Type = FormatCatalog.Instance.GetTypeFromName (e.Name, ContainedFormats));
             return new ArcFile (file, this, dir);
         }
 

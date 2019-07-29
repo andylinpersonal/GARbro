@@ -614,9 +614,7 @@ namespace GameRes.Formats.ShiinaRio
         private byte[]  m_extra;
         private int     m_common_length;
 
-        static readonly byte[] EmptyArray = new byte[0]; // Array.Empty<T>() available in .Net 4.6 only
-
-        public ImageArray (byte[] common) : this (common, common.Length, EmptyArray)
+        public ImageArray (byte[] common) : this (common, common.Length, Array.Empty<byte>())
         {
         }
 
@@ -891,7 +889,7 @@ namespace GameRes.Formats.ShiinaRio
 
         void Crc16Crypt (byte[] data, int index, int length)
         {
-            var crc16 = new Kogado.Crc16();
+            var crc16 = new Crc16();
             crc16.Update (data, index, length & 0x7E | 1);
             var sum = crc16.Value ^ 0xFFFF;
             data[index + 0x104] ^= (byte)sum;
@@ -1056,7 +1054,20 @@ namespace GameRes.Formats.ShiinaRio
     }
 
     [Serializable]
-    public class AdlerCrypt : IDecryptExtra
+    public class AdlerCrypt
+    {
+        internal void Transform (byte[] data, int index, int length)
+        {
+            uint key = Adler32.Compute (data, index, length);
+            data[index + 0x200] ^= (byte)key;
+            data[index + 0x201] ^= (byte)(key >> 8);
+            data[index + 0x202] ^= (byte)(key >> 16);
+            data[index + 0x203] ^= (byte)(key >> 24);
+        }
+    }
+
+    [Serializable]
+    public class PostAdlerCrypt : AdlerCrypt, IDecryptExtra
     {
         public void Decrypt (byte[] data, int index, uint length, uint flags)
         {
@@ -1069,14 +1080,21 @@ namespace GameRes.Formats.ShiinaRio
             if (length >= 0x400 && (flags & 0x104) == 0x104)
                 Transform (data, index, 0xFF);
         }
+    }
 
-        void Transform (byte[] data, int index, int length)
+    [Serializable]
+    public class PreAdlerCrypt : AdlerCrypt, IDecryptExtra
+    {
+        public void Decrypt (byte[] data, int index, uint length, uint flags)
         {
-            uint key = Adler32.Compute (data, index, length);
-            data[index + 0x200] ^= (byte)key;
-            data[index + 0x201] ^= (byte)(key >> 8);
-            data[index + 0x202] ^= (byte)(key >> 16);
-            data[index + 0x203] ^= (byte)(key >> 24);
+            if (length >= 0x400 && (flags & 0x202) == 0x202)
+                Transform (data, index, 0xFF);
+        }
+
+        public void Encrypt (byte[] data, int index, uint length, uint flags)
+        {
+            if (length >= 0x400 && (flags & 0x102) == 0x102)
+                Transform (data, index, 0xFF);
         }
     }
 

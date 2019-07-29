@@ -59,6 +59,7 @@ namespace GameRes.Formats.NonColor
         public ulong    Hash;
         public string   FileListName;
         public bool     LowCaseNames;
+        public bool     IgnoreScriptKey;
 
         public Scheme(string title)
         {
@@ -129,13 +130,7 @@ namespace GameRes.Formats.NonColor
                 return null;
 
             using (var index = new NcIndexReader (file, count))
-            {
-                var file_map = ReadFilenameMap (scheme);
-                var dir = index.Read (file_map);
-                if (null == dir)
-                    return null;
-                return new ArcDatArchive (file, this, dir, scheme.Hash);
-            }
+                return index.Read (this, scheme);
         }
 
         public override Stream OpenEntry (ArcFile arc, Entry entry)
@@ -149,6 +144,8 @@ namespace GameRes.Formats.NonColor
             {
                 if (darc.MasterKey != 0)
                     DecryptData (data, (uint)(dent.Hash ^ darc.MasterKey));
+                else if (6 == dent.Flags)
+                    DecryptData (data, (uint)dent.Hash);
                 return new ZLibStream (new MemoryStream (data), CompressionMode.Decompress);
             }
             // 1 == dent.Flags
@@ -282,10 +279,10 @@ namespace GameRes.Formats.NonColor
         protected IBinaryStream m_input;
         private   List<Entry>   m_dir;
         private   int           m_count;
-        private   long          m_max_offset;
+        private   ArcView       m_file;
 
         public long IndexPosition { get; set; }
-        public long     MaxOffset { get { return m_max_offset; } }
+        public long     MaxOffset { get { return m_file.MaxOffset; } }
         public bool ExtendByteSign { get; protected set; }
 
         protected NcIndexReaderBase (ArcView file, int count)
@@ -293,8 +290,18 @@ namespace GameRes.Formats.NonColor
             m_input = file.CreateStream();
             m_dir = new List<Entry> (count);
             m_count = count;
-            m_max_offset = file.MaxOffset;
+            m_file = file;
             IndexPosition = 4;
+        }
+
+        public ArcFile Read (DatOpener format, Scheme scheme)
+        {
+            var file_map = format.ReadFilenameMap (scheme);
+            var dir = Read (file_map);
+            if (null == dir)
+                return null;
+            var master_key = scheme.IgnoreScriptKey ? 0ul : scheme.Hash;
+            return new ArcDatArchive (m_file, format, dir, master_key);
         }
 
         public List<Entry> Read (IDictionary<ulong, NameRecord> file_map)
@@ -311,26 +318,29 @@ namespace GameRes.Formats.NonColor
                     entry.Name = known_rec.Name;
                     entry.Type = FormatCatalog.Instance.GetTypeFromName (entry.Name);
                     entry.RawName = known_rec.NameBytes;
+                    if (null == last_name && i > 0)
+                    {
+                        Trace.WriteLine (string.Format ("[{0}] {1}", i, known_rec.Name), "[noncolor]");
+                        last_reported = i;
+                    }
+                }
+                else
+                {
+                    if (last_name != null && last_reported != i-1)
+                        Trace.WriteLine (string.Format ("[{0}] {1}", i-1, last_name), "[noncolor]");
+                    Trace.WriteLine (string.Format ("[{0}] Unknown hash {1:X08}", i, entry.Hash), "[noncolor]");
+                    last_name = null;
                 }
                 if (0 == (entry.Flags & 2))
                 {
                     if (null == known_rec.Name)
                     {
-                        if (last_name != null && last_reported != i-1)
-                            Trace.WriteLine (string.Format ("[{0}] {1}", i-1, last_name), "[noncolor]");
-                        Trace.WriteLine (string.Format ("[{0}] Unknown hash {1:X8}", i, entry.Hash), "[noncolor]");
-                        last_name = null;
                         ++skipped;
                         continue;
                     }
                     else
                     {
                         var raw_name = known_rec.NameBytes;
-                        if (null == last_name && i > 0)
-                        {
-                            Trace.WriteLine (string.Format ("[{0}] {1}", i, known_rec.Name), "[noncolor]");
-                            last_reported = i;
-                        }
                         entry.Offset        ^= Extend8Bit (raw_name[raw_name.Length >> 1]);
                         entry.Size          ^= Extend8Bit (raw_name[raw_name.Length >> 2]);
                         entry.UnpackedSize  ^= Extend8Bit (raw_name[raw_name.Length >> 3]);

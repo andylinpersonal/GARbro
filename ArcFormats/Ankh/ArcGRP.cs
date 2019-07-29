@@ -27,6 +27,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.IO;
+using GameRes.Compression;
 using GameRes.Utility;
 
 namespace GameRes.Formats.Ankh
@@ -123,7 +124,9 @@ namespace GameRes.Formats.Ankh
                     entry.Offset += 4;
                     entry.Size   -= 4;
                 }
-                else if (entry.Size > 12 && header.AsciiEqual (8, "RIFF"))
+                else if (entry.Size > 12 &&
+                         (header.AsciiEqual (8, "RIFF") ||
+                          ((header[4] & 0xF) == 0xF && header.AsciiEqual (5, "RIFF"))))
                 {
                     entry.ChangeType (AudioFormat.Wav);
                     entry.UnpackedSize = header.ToUInt32 (0);
@@ -174,9 +177,19 @@ namespace GameRes.Formats.Ankh
                         return OpenTpw (arc, pent);
                     if (arc.File.View.AsciiEqual (entry.Offset+4, "HDJ\0"))
                         return OpenImage (arc, pent);
-                    if (entry.Size > 12 && 'W' == arc.File.View.ReadByte (entry.Offset+4)
-                        && arc.File.View.AsciiEqual (entry.Offset+8, "RIFF"))
-                        return OpenAudio (arc, entry);
+                    if (entry.Size > 12)
+                    {
+                        byte type = arc.File.View.ReadByte (entry.Offset+4);
+                        if ('W' == type
+                            && arc.File.View.AsciiEqual (entry.Offset+8, "RIFF"))
+                            return OpenAudio (arc, entry);
+                        if ((type & 0xF) == 0xF
+                            && arc.File.View.AsciiEqual (entry.Offset+5, "RIFF"))
+                        {
+                            var input = arc.File.CreateStream (entry.Offset+4, entry.Size-4);
+                            return new LzssStream (input);
+                        }
+                    }
                 }
                 catch (Exception X)
                 {
@@ -240,15 +253,16 @@ namespace GameRes.Formats.Ankh
                     int count;
                     if (ctl < 0x40)
                     {
-                        input.Read (output, dst, ctl);
-                        dst += ctl;
+                        count = Math.Min (ctl, output.Length - dst);
+                        input.Read (output, dst, count);
+                        dst += count;
                     }
                     else if (ctl <= 0x6F)
                     {
                         if (0x6F == ctl)
                             count = input.ReadUInt16();
                         else
-                            count = (ctl + 0xC3) & 0xFF;
+                            count = ctl - 0x3D;
                         byte v = input.ReadUInt8();
                         while (count --> 0)
                             output[dst++] = v;
@@ -258,7 +272,7 @@ namespace GameRes.Formats.Ankh
                         if (ctl == 0x9F)
                             count = input.ReadUInt16();
                         else 
-                            count = (ctl + 0x92) & 0xFF;
+                            count = ctl - 0x6E;
                         byte v1 = input.ReadUInt8();
                         byte v2 = input.ReadUInt8();
                         while (count --> 0)
@@ -272,7 +286,7 @@ namespace GameRes.Formats.Ankh
                         if (ctl == 0xBF)
                             count = input.ReadUInt16();
                         else
-                            count = ((ctl + 0x62) & 0xFF);
+                            count = ctl - 0x9E;
                         input.Read (output, dst, 3);
                         if (count > 0)
                         {

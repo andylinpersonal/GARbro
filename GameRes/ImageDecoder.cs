@@ -25,6 +25,7 @@
 
 using System;
 using System.IO;
+using System.Windows.Media.Imaging;
 
 namespace GameRes
 {
@@ -123,15 +124,7 @@ namespace GameRes
         public Stream            Source { get { m_input.Position = 0; return m_input.AsStream; } }
         public ImageFormat SourceFormat { get { return null; } }
         public ImageMetaData       Info { get; protected set; }
-        public ImageData Image
-        {
-            get
-            {
-                if (null == m_image)
-                    m_image = GetImageData();
-                return m_image;
-            }
-        }
+        public ImageData          Image { get { return m_image ?? (m_image = GetImageData()); } }
 
         protected BinaryImageDecoder (IBinaryStream input)
         {
@@ -164,5 +157,27 @@ namespace GameRes
             }
         }
         #endregion
+    }
+
+    public class BitmapSourceDecoder : IImageDecoder
+    {
+        public Stream            Source { get; set; }
+        public ImageFormat SourceFormat { get; set; }
+        public ImageMetaData       Info { get; private set; }
+        public ImageData          Image { get; private set; }
+
+        public BitmapSourceDecoder (BitmapSource bitmap)
+        {
+            Info = new ImageMetaData {
+                Width = (uint)bitmap.PixelWidth,
+                Height = (uint)bitmap.PixelHeight,
+                BPP = bitmap.Format.BitsPerPixel,
+            };
+            Image = new ImageData (bitmap);
+        }
+
+        public void Dispose ()
+        {
+        }
     }
 }

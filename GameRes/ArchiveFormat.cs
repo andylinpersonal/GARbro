@@ -26,6 +26,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace GameRes
 {
@@ -41,7 +42,25 @@ namespace GameRes
         /// </summary>
         public abstract bool IsHierarchic { get; }
 
+        /// <summary>
+        /// Tags of formats related to this archive format (could be null).
+        /// </summary>
+        public IEnumerable<string> ContainedFormats { get; protected set; }
+
         public abstract ArcFile TryOpen (ArcView view);
+
+        /// <summary>
+        /// Create GameRes.Entry corresponding to <paramref name="filename"/> extension.
+        /// </summary>
+        /// <exception cref="System.ArgumentException">May be thrown if filename contains invalid
+        /// characters.</exception>
+        public EntryType Create<EntryType> (string filename) where EntryType : Entry, new()
+        {
+            return new EntryType {
+                Name = filename,
+                Type = FormatCatalog.Instance.GetTypeFromName (filename, ContainedFormats),
+            };
+        }
 
         /// <summary>
         /// Extract file referenced by <paramref name="entry"/> into current directory.
@@ -58,7 +77,10 @@ namespace GameRes
         /// </summary>
         public virtual Stream OpenEntry (ArcFile arc, Entry entry)
         {
-            return arc.File.CreateStream (entry.Offset, entry.Size, entry.Name);
+            if (entry.Size > 0)
+                return arc.File.CreateStream (entry.Offset, entry.Size, entry.Name);
+            else
+                return Stream.Null;
         }
 
         /// <summary>

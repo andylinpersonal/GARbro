@@ -117,7 +117,7 @@ namespace GameRes
             if (size < 14+header_size)
             {
                 // some otherwise valid bitmaps have size field set to zero
-                if (size != 0 || !file.AsStream.CanSeek)
+                if (size != 0 && size != 0xE || !file.AsStream.CanSeek)
                     return null;
                 size = (uint)file.Length;
             }
@@ -176,6 +176,10 @@ namespace GameRes
                         if (length_with_alpha == file.Length || length_with_alpha + info.Width == file.Length)
                             return ReadBitmapWithAlpha (file, info);
                     }
+                }
+                else if (0x20 == info.BPP && (info.ImageLength - (width_x_height * 3 + info.ImageOffset)) <= 2)
+                {
+                    return ReadBitmapBGRA (file, info);
                 }
             }
             return null;

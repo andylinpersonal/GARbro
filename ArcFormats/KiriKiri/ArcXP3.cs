@@ -89,6 +89,7 @@ namespace GameRes.Formats.KiriKiri
         public Xp3Opener ()
         {
             Signatures = new uint[] { 0x0d335058, 0 };
+            ContainedFormats = new[] { "TLG", "BMP", "PNG", "JPEG", "OGG", "WAV", "TXT" };
         }
         
         static readonly byte[] s_xp3_header = {
@@ -160,7 +161,12 @@ namespace GameRes.Formats.KiriKiri
                             long section_size = header.ReadInt64();
                             entry_size -= 12;
                             if (section_size > entry_size)
-                                break;
+                            {
+                                // allow "info" sections with wrong size
+                                if (section != 0x6f666e69)
+                                    break;
+                                section_size = entry_size;
+                            }
                             entry_size -= section_size;
                             long next_section_pos = header.BaseStream.Position + section_size;
                             switch (section)
@@ -202,7 +208,7 @@ namespace GameRes.Formats.KiriKiri
                                     goto NextEntry;
                                 }
                                 entry.Name = name;
-                                entry.Type = FormatCatalog.Instance.GetTypeFromName (name);
+                                entry.Type = FormatCatalog.Instance.GetTypeFromName (name, ContainedFormats);
                                 entry.IsEncrypted = !(entry.Cipher is NoCrypt)
                                     && !(entry.Cipher.StartupTjsNotEncrypted && "startup.tjs" == name);
                                 break;
@@ -888,4 +894,14 @@ NextEntry:
             }
         }
     }
+
+    [Export(typeof(ResourceAlias))]
+    [ExportMetadata("Extension", "ANM")]
+    [ExportMetadata("Target", "TXT")]
+    public class AnmFormat : ResourceAlias { }
+
+    [Export(typeof(ResourceAlias))]
+    [ExportMetadata("Extension", "ASD")]
+    [ExportMetadata("Target", "TXT")]
+    public class AsdFormat : ResourceAlias { }
 }

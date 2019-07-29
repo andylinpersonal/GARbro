@@ -68,6 +68,11 @@ namespace GameRes.Formats.Tamamo
         public override bool  IsHierarchic { get { return false; } }
         public override bool      CanWrite { get { return false; } }
 
+        public PckOpener ()
+        {
+            ContainedFormats = new[] { "PNG", "DDS", "OGG", "WAV", "TXT", "DAT/GENERIC" };
+        }
+
         public override ArcFile TryOpen (ArcView file)
         {
             if (!file.View.AsciiEqual (4, "_FILE001"))
@@ -99,7 +104,7 @@ namespace GameRes.Formats.Tamamo
                 pos = name_end+1;
                 uint enc_size = index.ToUInt32 (pos);
                 pos += 4;
-                var entry = FormatCatalog.Instance.Create<PackedEntry> (name);
+                var entry = Create<PackedEntry> (name);
                 entry.Offset = data_offset;
                 entry.Size = enc_size;
                 entry.UnpackedSize = size;
@@ -160,8 +165,9 @@ namespace GameRes.Formats.Tamamo
                     return decoder;
                 using (decoder)
                 {
-                    var ev_bitmap = CreateCanvas (1280, 720, source, new Int32Rect (0, 0, 1024, 720));
-                    CopyRegion (source, new Int32Rect (0, 720, 720, 256), ev_bitmap, 1024, 0);
+                    var ev_bitmap = CreateCanvas (1280, 720, source, new Int32Rect (0, 0, 1024, 719));
+                    // XXX Senkou no Kishi texture
+                    CopyRegion (source, new Int32Rect (0, 719, 720, 256), ev_bitmap, 1024, 0);
                     return new BitmapSourceDecoder (ev_bitmap);
                 }
             }
@@ -258,25 +264,8 @@ namespace GameRes.Formats.Tamamo
         }
     }
 
-    internal class BitmapSourceDecoder : IImageDecoder
-    {
-        public Stream            Source { get { return null; } }
-        public ImageFormat SourceFormat { get { return null; } }
-        public ImageMetaData       Info { get; private set; }
-        public ImageData          Image { get; private set; }
-
-        public BitmapSourceDecoder (BitmapSource bitmap)
-        {
-            Info = new ImageMetaData {
-                Width = (uint)bitmap.PixelWidth,
-                Height = (uint)bitmap.PixelHeight,
-                BPP = bitmap.Format.BitsPerPixel,
-            };
-            Image = new ImageData (bitmap);
-        }
-
-        public void Dispose ()
-        {
-        }
-    }
+    [Export(typeof(ResourceAlias))]
+    [ExportMetadata("Extension", "TMX")]
+    [ExportMetadata("Target", "DAT/GENERIC")]
+    public class TmxFormat : ResourceAlias { }
 }
