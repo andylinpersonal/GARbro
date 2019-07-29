@@ -741,5 +741,65 @@ namespace GameRes.Formats.Properties {
                 this["OGGFixCrc"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("65001")]
+        public int PFSEncodingCP {
+            get {
+                return ((int)(this["PFSEncodingCP"]));
+            }
+            set {
+                this["PFSEncodingCP"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("44100")]
+        public uint ODNAudioSampleRate {
+            get {
+                return ((uint)(this["ODNAudioSampleRate"]));
+            }
+            set {
+                this["ODNAudioSampleRate"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("932")]
+        public int NOAEncodingCP {
+            get {
+                return ((int)(this["NOAEncodingCP"]));
+            }
+            set {
+                this["NOAEncodingCP"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string LEAFTitle {
+            get {
+                return ((string)(this["LEAFTitle"]));
+            }
+            set {
+                this["LEAFTitle"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string SJDatTitle {
+            get {
+                return ((string)(this["SJDatTitle"]));
+            }
+            set {
+                this["SJDatTitle"] = value;
+            }
+        }
     }
 }

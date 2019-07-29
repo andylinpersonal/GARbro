@@ -86,15 +86,12 @@ namespace GameRes.Formats.Seraphim
 
         public override ArcFile TryOpen (ArcView file)
         {
-            if (file.MaxOffset > uint.MaxValue)
+            if (file.MaxOffset > uint.MaxValue
+                || !VFS.IsPathEqualsToFileName (file.Name, "ArchPac.dat"))
                 return null;
-            string name = Path.GetFileName (file.Name);
-            if (!name.Equals ("ArchPac.dat", StringComparison.InvariantCultureIgnoreCase))
-                return null;
-
-            foreach (var scheme in KnownSchemes.Values.Where (s => s.IndexOffset < file.MaxOffset))
+            foreach (var scheme in KnownSchemes.Values.Where (s => s.IndexOffset < file.MaxOffset).OrderBy (s => s.IndexOffset))
             {
-                var dir = ReadIndex (file, scheme);
+                var dir = ReadIndex (file, scheme.IndexOffset, file.MaxOffset);
                 if (dir != null)
                 {
                     if (scheme.EventMap != null)
@@ -103,16 +100,29 @@ namespace GameRes.Formats.Seraphim
                         return new ArcFile (file, this, dir);
                 }
             }
+            var scnpac_name = VFS.ChangeFileName (file.Name, "ScnPac.dat");
+            if (!VFS.FileExists (scnpac_name))
+                return null;
+            using (var scnpac = VFS.OpenView (scnpac_name))
+            {
+                uint first_offset = scnpac.View.ReadUInt32 (4);
+                uint index_offset = scnpac.View.ReadUInt32 (first_offset-4);
+                var dir = ReadIndex (scnpac, index_offset, file.MaxOffset);
+                if (dir != null)
+                    return new ArcFile (file, this, dir);
+            }
             return null;
         }
 
-        List<Entry> ReadIndex (ArcView file, ArchPacScheme scheme)
+        // 3 @ ScnPac.Dat : FF 18 05 XX XX XX XX
+        //                  FF 16 05 XX XX XX XX
+
+        List<Entry> ReadIndex (ArcView file, long index_offset, long max_offset)
         {
-            long index_offset = scheme.IndexOffset;
             int base_count = file.View.ReadInt32 (index_offset);
             int file_count = file.View.ReadInt32 (index_offset + 4);
             index_offset += 8;
-            if (base_count <= 0 || base_count > 0x100 || !IsSaneCount (file_count))
+            if (base_count <= 0 || base_count > 0x40 || !IsSaneCount (file_count))
                 return null;
             var base_offsets = new List<Tuple<uint, int>> (base_count);
             int total_count = 0;
@@ -120,7 +130,7 @@ namespace GameRes.Formats.Seraphim
             {
                 uint offset = file.View.ReadUInt32 (index_offset);
                 int count = file.View.ReadInt32 (index_offset+4);
-                if (count <= 0 || count > file_count || offset > file.MaxOffset)
+                if (count <= 0 || count > file_count || offset > max_offset)
                     return null;
                 total_count += count;
                 if (total_count > file_count)
@@ -150,7 +160,7 @@ namespace GameRes.Formats.Seraphim
                         return null;
                     entry.Size = (uint)(next_offset - entry.Offset);
                     entry.Offset += base_offsets[j].Item1;
-                    if (!entry.CheckPlacement (file.MaxOffset))
+                    if (!entry.CheckPlacement (max_offset))
                         return null;
                     if (entry.Size > 0)
                         dir.Add (entry);
@@ -166,12 +176,21 @@ namespace GameRes.Formats.Seraphim
             if (0 == entry.Size)
                 return Stream.Null;
             var input = arc.File.CreateStream (entry.Offset, entry.Size);
-            if (!(entry is PackedEntry))
+            var pent = entry as PackedEntry;
+            if (null == pent)
                 return input;
-            int signature = arc.File.View.ReadUInt16 (entry.Offset);
-            if (0x9C78 != signature)
-                return input;
-            return new ZLibStream (input, CompressionMode.Decompress);
+            if (0x9C78 == (input.Signature & 0xFFFF))
+            {
+                pent.IsPacked = true;
+                return new ZLibStream (input, CompressionMode.Decompress);
+            }
+            if (1 == input.Signature && arc.File.View.ReadByte (entry.Offset+4) == 0x78)
+            {
+                pent.IsPacked = true;
+                input.Position = 4;
+                return new ZLibStream (input, CompressionMode.Decompress);
+            }
+            return input;
         }
 
         public override IImageDecoder OpenImage (ArcFile arc, Entry entry)
@@ -180,7 +199,7 @@ namespace GameRes.Formats.Seraphim
             var aent = entry as ArchEntry;
             if (null == sarc || null == aent || null == sarc.EventMap
                 || aent.DirIndex != sarc.EventDir || !sarc.EventMap.ContainsKey (aent.FileIndex))
-                return base.OpenImage (arc, entry);
+                return OpenRawImage (arc, entry);
             var base_index = sarc.EventMap[aent.FileIndex];
             var base_entry = sarc.Dir.Cast<ArchEntry>()
                 .FirstOrDefault (e => e.DirIndex == sarc.EventDir && e.FileIndex == base_index);
@@ -191,6 +210,31 @@ namespace GameRes.Formats.Seraphim
                 return base.OpenImage (arc, entry);
             var input = arc.OpenBinaryEntry (entry);
             return new CtOverlayDecoder (input, base_img);
+        }
+
+        IImageDecoder OpenRawImage (ArcFile arc, Entry entry)
+        {
+            var input = arc.OpenBinaryEntry (entry);
+            try
+            {
+                uint width  = input.ReadUInt16();
+                uint height = input.ReadUInt16();
+                if (width > 0x4100 || 0 == width || 0 == height || width * height * 3 + 4 != input.Length)
+                {
+                    input.Position = 0;
+                    return new ImageFormatDecoder (input);
+                }
+                else
+                {
+                    var info = new ImageMetaData { Width = width, Height = height, BPP = 24 };
+                    return new RawBitmapDecoder (input, info);
+                }
+            }
+            catch
+            {
+                input.Dispose();
+                throw;
+            }
         }
 
         SeraphReader OpenCtImage (ArcFile arc, Entry entry)
@@ -262,6 +306,21 @@ namespace GameRes.Formats.Seraphim
                 }
             }
             return ImageData.Create (Info, PixelFormats.Bgra32, null, dst);
+        }
+    }
+
+    internal class RawBitmapDecoder : BinaryImageDecoder
+    {
+        public RawBitmapDecoder (IBinaryStream input, ImageMetaData info) : base (input, info)
+        {
+        }
+
+        protected override ImageData GetImageData ()
+        {
+            m_input.Position = 4;
+            int stride = (int)Info.Width * 3;
+            var pixels = m_input.ReadBytes ((int)Info.Height * stride);
+            return ImageData.Create (Info, PixelFormats.Bgr24, null, pixels, stride);
         }
     }
 }

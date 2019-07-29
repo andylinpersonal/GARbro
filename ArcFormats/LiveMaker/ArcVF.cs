@@ -2,7 +2,7 @@
 //! \date       Wed Jun 08 00:27:36 2016
 //! \brief      LiveMaker resource archive.
 //
-// Copyright (C) 2016 by morkt
+// Copyright (C) 2016-2019 by morkt
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to
@@ -28,6 +28,7 @@ using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using GameRes.Compression;
 
 namespace GameRes.Formats.LiveMaker
@@ -51,13 +52,14 @@ namespace GameRes.Formats.LiveMaker
         {
             uint base_offset = 0;
             ArcView index_file = file;
-            ArcView extra_file = null;
             try
             {
                 // possible filesystem structure:
                 //   game.dat  -- main archive body
-                //   game.001  -- [optional] extra part
                 //   game.ext  -- [optional] separate index (could be included into the main body)
+                //   game.001  -- [optional] extra parts
+                //   game.002
+                //   ...
 
                 uint signature = index_file.View.ReadUInt32 (0);
                 if (file.Name.HasExtension (".exe")
@@ -88,36 +90,29 @@ namespace GameRes.Formats.LiveMaker
                 if (null == dir)
                     return null;
                 long max_offset = file.MaxOffset;
-                for (int i = 0; i < dir.Count; ++i)
+                var parts = new List<ArcView>();
+                try
                 {
-                    if (!dir[i].CheckPlacement (max_offset))
+                    for (int i = 1; i < 100; ++i)
                     {
-                        if (extra_file != null)
-                        {
-                            // remove entries that don't fit into game.dat+game.001
-                            int discard = dir.Count - i;
-                            Trace.WriteLine (string.Format ("{0} entries didn't fit and were discarded", discard), "[vff]");
-                            dir.RemoveRange (i, discard);
+                        var ext = string.Format (".{0:D3}", i);
+                        var part_filename = Path.ChangeExtension (file.Name, ext);
+                        if (!VFS.FileExists (part_filename))
                             break;
-                        }
-                        var extra_filename = Path.ChangeExtension (file.Name, ".001");
-                        if (!VFS.FileExists (extra_filename))
-                            return null;
-                        extra_file = VFS.OpenView (extra_filename);
-                        max_offset += extra_file.MaxOffset;
-                        if (!dir[i].CheckPlacement (max_offset))
-                            return null;
+                        var arc_file = VFS.OpenView (part_filename);
+                        max_offset += arc_file.MaxOffset;
+                        parts.Add (arc_file);
                     }
                 }
-                if (null == extra_file)
+                catch
+                {
+                    foreach (var part in parts)
+                        part.Dispose();
+                    throw;
+                }
+                if (0 == parts.Count)
                     return new ArcFile (file, this, dir);
-                return new VffArchive (file, this, dir, extra_file);
-            }
-            catch
-            {
-                if (extra_file != null)
-                    extra_file.Dispose();
-                throw;
+                return new MultiFileArchive (file, this, dir, parts);
             }
             finally
             {
@@ -128,18 +123,30 @@ namespace GameRes.Formats.LiveMaker
 
         public override Stream OpenEntry (ArcFile arc, Entry entry)
         {
-            var vff = arc as VffArchive;
+            var vff = arc as MultiFileArchive;
             Stream input = null;
             if (vff != null)
                 input = vff.OpenStream (entry);
             else
                 input = arc.File.CreateStream (entry.Offset, entry.Size);
 
-            var pent = entry as PackedEntry;
-            if (pent != null && pent.IsPacked)
-                return new ZLibStream (input, CompressionMode.Decompress);
-            else
+            var pent = entry as VfEntry;
+            if (null == pent)
                 return input;
+            if (pent.IsScrambled)
+            {
+                byte[] data;
+                using (input)
+                {
+                    if (entry.Size <= 8)
+                        return Stream.Null;
+                    data = ReshuffleStream (input);
+                }
+                input = new BinMemoryStream (data, entry.Name);
+            }
+            if (pent.IsPacked)
+                input = new ZLibStream (input, CompressionMode.Decompress);
+            return input;
         }
 
         List<Entry> ReadIndex (ArcView file, uint base_offset, int count)
@@ -159,7 +166,7 @@ namespace GameRes.Formats.LiveMaker
                 index_offset += name_length;
 
                 var name = DecryptName (name_buffer, (int)name_length, rnd);
-                dir.Add (FormatCatalog.Instance.Create<PackedEntry> (name));
+                dir.Add (Create<VfEntry> (name));
             }
             rnd.Reset();
             long offset = base_offset + (file.View.ReadInt64 (index_offset) ^ (int)rnd.GetRand32());
@@ -172,9 +179,11 @@ namespace GameRes.Formats.LiveMaker
                 offset = next_offset;
             }
             index_offset += 8;
-            foreach (PackedEntry entry in dir)
+            foreach (VfEntry entry in dir)
             {
-                entry.IsPacked = 0 == file.View.ReadByte (index_offset++);
+                byte flags = file.View.ReadByte (index_offset++);
+                entry.IsPacked = 0 == flags || 3 == flags;
+                entry.IsScrambled = 2 == flags || 3 == flags;
             }
             return dir;
         }
@@ -193,6 +202,47 @@ namespace GameRes.Formats.LiveMaker
             var exe = new ExeFile (file);
             return (uint)exe.Overlay.Offset;
         }
+
+        byte[] ReshuffleStream (Stream input)
+        {
+            var header = new byte[8];
+            input.Read (header, 0, 8);
+            int chunk_size = header.ToInt32 (0);
+            uint seed = header.ToUInt32 (4) ^ 0xF8EAu;
+            int input_length = (int)input.Length - 8;
+            var output = new byte[input_length];
+            int count = (input_length - 1) / chunk_size + 1;
+            int dst = 0;
+            foreach (int i in RandomSequence (count, seed))
+            {
+                int position = i * chunk_size;
+                input.Position = 8 + position;
+                int length = Math.Min (chunk_size, input_length - position);
+                input.Read (output, dst, length);
+                dst += length;
+            }
+            return output;
+        }
+
+        static IEnumerable<int> RandomSequence (int count, uint seed)
+        {
+            var tp = new TpScramble (seed);
+            var order = Enumerable.Range (0, count).ToList<int>();
+            var seq = new int[order.Count];
+            for (int i = 0; order.Count > 1; ++i)
+            {
+                int n = tp.GetInt32 (0, order.Count - 2);
+                seq[order[n]] = i;
+                order.RemoveAt (n);
+            }
+            seq[order[0]] = count - 1;
+            return seq;
+        }
+    }
+
+    internal class VfEntry : PackedEntry
+    {
+        public bool IsScrambled;
     }
 
     internal class TpRandom
@@ -219,42 +269,58 @@ namespace GameRes.Formats.LiveMaker
         }
     }
 
-    internal class VffArchive : ArcFile
+    internal class TpScramble
     {
-        readonly ArcView ExtraFile;
+        uint[]  m_state = new uint[5];
 
-        public VffArchive (ArcView arc, ArchiveFormat impl, ICollection<Entry> dir, ArcView extra_file)
-            : base (arc, impl, dir)
+        const uint FactorA = 2111111111;
+        const uint FactorB = 1492;
+        const uint FactorC = 1776;
+        const uint FactorD = 5115;
+
+        public TpScramble (uint seed)
         {
-            ExtraFile = extra_file;
+            Init (seed);
         }
 
-        internal Stream OpenStream (Entry entry)
+        public void Init (uint seed)
         {
-            if (entry.Offset < File.MaxOffset && entry.Offset+entry.Size > File.MaxOffset)
+            uint hash = seed != 0 ? seed : 0xFFFFFFFFu;
+            for (int i = 0; i < 5; ++i)
             {
-                var first_part = File.View.ReadBytes (entry.Offset, entry.Size);
-                var second_part = ExtraFile.CreateStream (0, entry.Size - (uint)first_part.Length);
-                return new PrefixStream (first_part, second_part);
+                hash ^= hash << 13;
+                hash ^= hash >> 17;
+                hash ^= hash << 5;
+                m_state[i] = hash;
             }
-            else if (entry.Offset >= File.MaxOffset)
+            for (int i = 0; i < 19; ++i)
             {
-                return ExtraFile.CreateStream (entry.Offset, entry.Size);
+                GetUInt32();
             }
-            else
-                return File.CreateStream (entry.Offset, entry.Size);
         }
 
-        bool _vff_disposed = false;
-        protected override void Dispose (bool disposing)
+        public int GetInt32 (int first, int last)
         {
-            if (!_vff_disposed)
-            {
-                if (disposing && ExtraFile != null)
-                    ExtraFile.Dispose();
-                _vff_disposed = true;
-            }
-            base.Dispose (disposing);
+            var num = GetDouble();
+            return (int)(first + (long)(num * (last - first + 1)));
+        }
+
+        double GetDouble ()
+        {
+            return (double)GetUInt32() / 0x100000000L;
+        }
+
+        uint GetUInt32 ()
+        {
+            ulong v = FactorA * (ulong)m_state[3]
+                    + FactorB * (ulong)m_state[2]
+                    + FactorC * (ulong)m_state[1]
+                    + FactorD * (ulong)m_state[0] + m_state[4];
+            m_state[3] = m_state[2];
+            m_state[2] = m_state[1];
+            m_state[1] = m_state[0];
+            m_state[4] = (uint)(v >> 32);
+            return m_state[0] = (uint)v;
         }
     }
 }

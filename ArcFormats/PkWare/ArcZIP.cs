@@ -100,6 +100,14 @@ namespace GameRes.Formats.PkWare
 
         static readonly byte[] PkDirSignature = { (byte)'P', (byte)'K', 5, 6 };
 
+        public ZipOpener ()
+        {
+            Settings = new[] { ZipEncoding };
+            Extensions = new string[] { "zip", "vndat" };
+        }
+
+        EncodingSetting ZipEncoding = new EncodingSetting ("ZIPEncodingCP", "DefaultEncoding");
+
         public override ArcFile TryOpen (ArcView file)
         {
             if (-1 == SearchForSignature (file, PkDirSignature))
@@ -118,7 +126,7 @@ namespace GameRes.Formats.PkWare
 
         internal ArcFile OpenZipArchive (ArcView file, Stream input)
         {
-            SharpZip.ZipConstants.DefaultCodePage = Properties.Settings.Default.ZIPEncodingCP;
+            SharpZip.ZipStrings.CodePage = Properties.Settings.Default.ZIPEncodingCP;
             var zip = new SharpZip.ZipFile (input);
             try
             {
@@ -179,18 +187,9 @@ namespace GameRes.Formats.PkWare
 
         public override ResourceOptions GetDefaultOptions ()
         {
-            Encoding enc;
-            try
-            {
-                enc = Encoding.GetEncoding (Properties.Settings.Default.ZIPEncodingCP);
-            }
-            catch
-            {
-                enc = Encodings.cp932;
-            }
             return new ZipOptions {
                 CompressionLevel = Properties.Settings.Default.ZIPCompression,
-                FileNameEncoding = enc,
+                FileNameEncoding = ZipEncoding.Get<Encoding>(),
                 Password = Properties.Settings.Default.ZIPPassword,
             };
         }

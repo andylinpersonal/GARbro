@@ -189,6 +189,15 @@ namespace GameRes.Formats.Strings {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Default file names encoding.
+        /// </summary>
+        public static string DefaultEncoding {
+            get {
+                return ResourceManager.GetString("DefaultEncoding", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Encryption keys.
         /// </summary>
         public static string DPKKeys {
@@ -603,6 +612,15 @@ namespace GameRes.Formats.Strings {
         public static string NSADescription {
             get {
                 return ResourceManager.GetString("NSADescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Default audio sampling rate.
+        /// </summary>
+        public static string ODNAudioSampleRate {
+            get {
+                return ResourceManager.GetString("ODNAudioSampleRate", resourceCulture);
             }
         }
         

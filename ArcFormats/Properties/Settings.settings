@@ -182,5 +182,20 @@
     <Setting Name="OGGFixCrc" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
+    <Setting Name="PFSEncodingCP" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">65001</Value>
+    </Setting>
+    <Setting Name="ODNAudioSampleRate" Type="System.UInt32" Scope="User">
+      <Value Profile="(Default)">44100</Value>
+    </Setting>
+    <Setting Name="NOAEncodingCP" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">932</Value>
+    </Setting>
+    <Setting Name="LEAFTitle" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="SJDatTitle" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
   </Settings>
 </SettingsFile>

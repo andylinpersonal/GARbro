@@ -43,7 +43,7 @@ namespace GameRes.Formats.AdPack
 
     internal class Ed8MetaData : ImageMetaData
     {
-        public uint PaletteSize;
+        public int  PaletteSize;
         public uint CompSize;
     }
 
@@ -277,7 +277,7 @@ namespace GameRes.Formats.AdPack
                 return null;
             uint width  = header.ToUInt16 (0x0e);
             uint height = header.ToUInt16 (0x10);
-            uint palette_size = header.ToUInt32 (0x12);
+            int  palette_size = header.ToInt32 (0x12);
             uint comp_size  = header.ToUInt32 (0x16);
             if (palette_size > 0x100)
                 return null;
@@ -294,9 +294,7 @@ namespace GameRes.Formats.AdPack
 
         public override ImageData Read (IBinaryStream stream, ImageMetaData info)
         {
-            var meta = (Ed8MetaData)info;
-            stream.Position = 0x1a;
-            var reader = new Reader (stream.AsStream, meta);
+            var reader = new Reader (stream.AsStream, (Ed8MetaData)info);
             reader.Unpack();
             var palette = new BitmapPalette (reader.Palette);
             return ImageData.Create (info, PixelFormats.Indexed8, palette, reader.Data, (int)info.Width);
@@ -308,6 +306,7 @@ namespace GameRes.Formats.AdPack
             byte[]          m_data;
             Color[]         m_palette;
             int             m_width;
+            int             m_colors;
 
             public Color[] Palette { get { return m_palette; } }
             public byte[]     Data { get { return m_data; } }
@@ -322,21 +321,15 @@ namespace GameRes.Formats.AdPack
             public Reader (Stream file, Ed8MetaData info)
             {
                 m_width = (int)info.Width;
-                int palette_size = (int)info.PaletteSize*3;
-                var palette_data = new byte[Math.Max (0x300, palette_size)];
-                if (palette_size != file.Read (palette_data, 0, palette_size))
-                    throw new InvalidFormatException();
-                m_palette = new Color[0x100];
-                for (int i = 0; i < m_palette.Length; ++i)
-                {
-                    m_palette[i] = Color.FromRgb (palette_data[i*3+2], palette_data[i*3+1], palette_data[i*3]);
-                }
                 m_input = file;
                 m_data = new byte[info.Width * info.Height];
+                m_colors = info.PaletteSize;
             }
 
             public void Unpack ()
             {
+                m_input.Position = 0x1A;
+                m_palette = ReadColorMap (m_input, m_colors, PaletteFormat.Bgr);
                 int data_pos = 0;
                 while (data_pos < m_data.Length)
                 {

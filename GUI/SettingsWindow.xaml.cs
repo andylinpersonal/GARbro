@@ -24,13 +24,17 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 using GameRes;
+using GARbro.GUI.Properties;
 using GARbro.GUI.Strings;
 
 namespace GARbro.GUI
@@ -45,7 +49,16 @@ namespace GARbro.GUI
             InitializeComponent();
 
             this.DataContext = this.ViewModel = CreateSettingsTree();
+            this.Closing += (s, e) => {
+                var section = SectionsPane.SelectedItem as SettingsSectionView;
+                if (section != null)
+                    LastSelectedSection = section.Label;
+            };
         }
+
+        static readonly IEnumerable<IResourceSetting> ViewerSettings = new [] {
+            MainWindow.DownScaleImage,
+        };
 
         SettingsViewModel ViewModel;
 
@@ -68,9 +81,6 @@ namespace GARbro.GUI
         {
             ApplyChanges();
             DialogResult = true;
-            var section = SectionsPane.SelectedItem as SettingsSectionView;
-            if (section != null)
-                LastSelectedSection = section.Label;
         }
 
         private void ApplyChanges ()
@@ -78,7 +88,7 @@ namespace GARbro.GUI
             if (!ViewModel.HasChanges)
                 return;
             if (OnApplyChanges != null)
-                OnApplyChanges (this, new EventArgs());
+                OnApplyChanges (this, EventArgs.Empty);
             ViewModel.HasChanges = false;
         }
 
@@ -86,9 +96,12 @@ namespace GARbro.GUI
         {
             SettingsSectionView[] list = {
                 new SettingsSectionView {
+                    Label = guiStrings.TextViewer,
+                    Panel = CreateSectionPanel (ViewerSettings)
+                },
+                new SettingsSectionView {
                     Label = guiStrings.TextFormats,
                     Children = EnumerateFormatsSettings(),
-                    Panel = (UIElement)this.Resources["FormatsPanel"]
                 },
             };
             SettingsSectionView selected_section = null;
@@ -103,24 +116,10 @@ namespace GARbro.GUI
         IEnumerable<SettingsSectionView> EnumerateFormatsSettings ()
         {
             var list = new List<SettingsSectionView>();
-            foreach (var format in FormatCatalog.Instance.Formats.Where (f => f.Settings != null && f.Settings.Any()))
+            var formats = FormatCatalog.Instance.Formats.Where (f => f.Settings != null && f.Settings.Any());
+            foreach (var format in formats.OrderBy (f => f.Tag))
             {
-                var pane = new WrapPanel();
-                foreach (var setting in format.Settings)
-                {
-                    if (setting.Value is bool)
-                    {
-                        var view = new ResourceSettingView<bool> (setting);
-                        view.ValueChanged   += (s, e) => ViewModel.HasChanges = true;
-                        this.OnApplyChanges += (s, e) => view.Apply();
-
-                        var check_box = new CheckBox {
-                            Template = (ControlTemplate)this.Resources["BoundCheckBox"],
-                            DataContext = view,
-                        };
-                        pane.Children.Add (check_box);
-                    }
-                }
+                var pane = CreateSectionPanel (format.Settings);
                 if (pane.Children.Count > 0)
                 {
                     var section = new SettingsSectionView {
@@ -132,6 +131,94 @@ namespace GARbro.GUI
                 }
             }
             return list;
+        }
+
+        Panel CreateSectionPanel (IEnumerable<IResourceSetting> settings)
+        {
+            var pane = new WrapPanel();
+            foreach (var setting in settings)
+            {
+                var widget = CreateSettingWidget (setting, setting.Value);
+                if (widget != null)
+                    pane.Children.Add (widget);
+            }
+            return pane;
+        }
+
+        UIElement CreateCheckBoxWidget (IResourceSetting setting)
+        {
+            return new CheckBox {
+                Template = (ControlTemplate)this.Resources["BoundCheckBox"],
+                DataContext = CreateSettingView<bool> (setting),
+            };
+        }
+
+        UIElement CreateEncodingWidget (IResourceSetting setting)
+        {
+            var view = CreateSettingView<Encoding> (setting);
+            // XXX make a control template in XAML instead
+            var container = new StackPanel {
+                Orientation = Orientation.Vertical,
+                Margin = new Thickness (2.0),
+                DataContext = view,
+            };
+            var caption = new TextBlock {
+                Text = view.Text,
+                ToolTip = view.Description,
+            };
+            var combo_box = new ComboBox {
+                ItemsSource = MainWindow.GetEncodingList (true),
+                Margin = new Thickness (0,4,0,0),
+                DisplayMemberPath = "EncodingName",
+                ToolTip = view.Description,
+            };
+            var binding = new Binding ("Value") {
+                Mode = BindingMode.TwoWay,
+                UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged,
+            };
+            BindingOperations.SetBinding (combo_box, ComboBox.SelectedItemProperty, binding);
+            container.Children.Add (caption);
+            container.Children.Add (combo_box);
+            return container;
+        }
+
+        UIElement CreateGaugeWidget (FixedGaugeSetting setting)
+        {
+            return new Slider {
+                Template = (ControlTemplate)this.Resources["BoundSlider"],
+                DataContext = CreateSettingView<int> (setting),
+                Ticks = new DoubleCollection (setting.ValuesSet.Select (x => (double)x)),
+            };
+        }
+
+        UIElement CreateDropDownWidget (FixedSetSetting setting)
+        {
+            return new ComboBox {
+                Template = (ControlTemplate)this.Resources["BoundDropDownList"],
+                DataContext = CreateSettingView<object> (setting),
+            };
+        }
+
+        UIElement CreateSettingWidget<TUnknown> (IResourceSetting setting, TUnknown value)
+        {
+            if (setting is FixedGaugeSetting)
+                return CreateGaugeWidget (setting as FixedGaugeSetting);
+            if (setting is FixedSetSetting)
+                return CreateDropDownWidget (setting as FixedSetSetting);
+            if (value is bool)
+                return CreateCheckBoxWidget (setting);
+            if (value is Encoding)
+                return CreateEncodingWidget (setting);
+            Trace.WriteLine (string.Format ("Unknown setting type {0}", value.GetType()), "[GUI]");
+            return null;
+        }
+
+        ISettingView CreateSettingView<TValue> (IResourceSetting setting)
+        {
+            var view = new ResourceSettingView<TValue> (setting);
+            view.ValueChanged   += (s, e) => ViewModel.HasChanges = true;
+            this.OnApplyChanges += (s, e) => view.Apply();
+            return view;
         }
 
         static IEnumerable<SettingsSectionView> EnumerateSections (IEnumerable<SettingsSectionView> list)
@@ -205,7 +292,19 @@ namespace GARbro.GUI
         public IEnumerable<SettingsSectionView> Children { get; set; }
     }
 
-    public class ResourceSettingView<TValue>
+    public interface ISettingView
+    {
+        IResourceSetting Source { get; }
+        bool          IsChanged { get; }
+        string             Text { get; }
+        string      Description { get; }
+
+        void Apply ();
+
+        event PropertyChangedEventHandler ValueChanged;
+    }
+
+    public class ResourceSettingView<TValue> : ISettingView
     {
         public IResourceSetting Source { get; private set; }
         public bool          IsChanged { get; private set; }
@@ -287,6 +386,38 @@ namespace GARbro.GUI
         public object ConvertBack (object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
         {
             throw new System.NotImplementedException();
+        }
+    }
+
+    internal class GuiResourceSetting : ResourceSettingBase, INotifyPropertyChanged
+    {
+        public override object Value {
+            get { return Settings.Default[Name]; }
+            set {
+                if (!Settings.Default[Name].Equals (value))
+                {
+                    Settings.Default[Name] = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public GuiResourceSetting () { }
+
+        public GuiResourceSetting (string name)
+        {
+            Name = name;
+            Text = guiStrings.ResourceManager.GetString (name, guiStrings.Culture) ?? name;
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        void OnPropertyChanged ([CallerMemberName] string propertyName = "")
+        {
+            if (PropertyChanged != null)
+            {
+                PropertyChanged (this, new PropertyChangedEventArgs (propertyName));
+            }
         }
     }
 }

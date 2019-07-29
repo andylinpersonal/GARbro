@@ -104,19 +104,6 @@ namespace GameRes
             encoder.Save (file);
         }
 
-        void SkipBytes (IBinaryStream file, uint num)
-        {
-            if (file.AsStream.CanSeek)
-                file.Seek (num, SeekOrigin.Current);
-            else
-            {
-                for (int i = 0; i < num / 4; ++i)
-                    file.ReadInt32();
-                for (int i = 0; i < num % 4; ++i)
-                    file.ReadByte();
-            }
-        }
-
         public override ImageMetaData ReadMetaData (IBinaryStream file)
         {
             int c1 = file.ReadByte();
@@ -130,7 +117,7 @@ namespace GameRes
             if (size < 14+header_size)
             {
                 // some otherwise valid bitmaps have size field set to zero
-                if (size != 0 || !file.AsStream.CanSeek)
+                if (size != 0 && size != 0xE || !file.AsStream.CanSeek)
                     return null;
                 size = (uint)file.Length;
             }
@@ -189,6 +176,10 @@ namespace GameRes
                         if (length_with_alpha == file.Length || length_with_alpha + info.Width == file.Length)
                             return ReadBitmapWithAlpha (file, info);
                     }
+                }
+                else if (0x20 == info.BPP && (info.ImageLength - (width_x_height * 3 + info.ImageOffset)) <= 2)
+                {
+                    return ReadBitmapBGRA (file, info);
                 }
             }
             return null;

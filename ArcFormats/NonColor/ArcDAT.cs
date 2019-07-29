@@ -58,6 +58,8 @@ namespace GameRes.Formats.NonColor
         public string   Title;
         public ulong    Hash;
         public string   FileListName;
+        public bool     LowCaseNames;
+        public bool     IgnoreScriptKey;
 
         public Scheme(string title)
         {
@@ -69,6 +71,14 @@ namespace GameRes.Formats.NonColor
         public virtual ulong ComputeHash (byte[] name)
         {
             return Crc64.Compute (name, 0, name.Length);
+        }
+
+        public byte[] GetBytes (string name)
+        {
+            if (LowCaseNames)
+                return name.ToLowerShiftJis();
+            else
+                return Encodings.cp932.GetBytes (name);
         }
     }
 
@@ -120,26 +130,22 @@ namespace GameRes.Formats.NonColor
                 return null;
 
             using (var index = new NcIndexReader (file, count))
-            {
-                var file_map = ReadFilenameMap (scheme);
-                var dir = index.Read (file_map);
-                if (null == dir)
-                    return null;
-                return new ArcDatArchive (file, this, dir, scheme.Hash);
-            }
+                return index.Read (this, scheme);
         }
 
         public override Stream OpenEntry (ArcFile arc, Entry entry)
         {
             var darc = arc as ArcDatArchive;
             var dent = entry as ArcDatEntry;
-            if (null == darc || null == dent || 0 == dent.Flags || 0 == dent.Size)
+            if (null == darc || null == dent || 0 == dent.Size)
                 return base.OpenEntry (arc, entry);
             var data = arc.File.View.ReadBytes (entry.Offset, entry.Size);
-            if (2 == dent.Flags)
+            if (dent.IsPacked)
             {
                 if (darc.MasterKey != 0)
                     DecryptData (data, (uint)(dent.Hash ^ darc.MasterKey));
+                else if (6 == dent.Flags)
+                    DecryptData (data, (uint)dent.Hash);
                 return new ZLibStream (new MemoryStream (data), CompressionMode.Decompress);
             }
             // 1 == dent.Flags
@@ -194,7 +200,7 @@ namespace GameRes.Formats.NonColor
             {
                 var dict = new Dictionary<ulong, NameRecord>();
                 FormatCatalog.Instance.ReadFileList (scheme.FileListName, line => {
-                    var bytes = line.ToLowerShiftJis();
+                    var bytes = scheme.GetBytes (line);
                     ulong hash = scheme.ComputeHash (bytes);
                     dict[hash] = new NameRecord { Name = line, NameBytes = bytes };
                 });
@@ -235,12 +241,14 @@ namespace GameRes.Formats.NonColor
             }
         }
 
-        public static Dictionary<string, Scheme> KnownSchemes = new Dictionary<string, Scheme>();
+        static ArcDatScheme DefaultScheme = new ArcDatScheme { KnownSchemes = new Dictionary<string, Scheme>() };
+
+        public static Dictionary<string, Scheme> KnownSchemes { get { return DefaultScheme.KnownSchemes; } }
 
         public override ResourceScheme Scheme
         {
-            get { return new ArcDatScheme { KnownSchemes = KnownSchemes }; }
-            set { KnownSchemes = ((ArcDatScheme)value).KnownSchemes; }
+            get { return DefaultScheme; }
+            set { DefaultScheme = (ArcDatScheme)value; }
         }
 
         internal Scheme QueryScheme (string arc_name)
@@ -271,23 +279,34 @@ namespace GameRes.Formats.NonColor
         protected IBinaryStream m_input;
         private   List<Entry>   m_dir;
         private   int           m_count;
-        private   long          m_max_offset;
+        private   ArcView       m_file;
 
         public long IndexPosition { get; set; }
-        public long     MaxOffset { get { return m_max_offset; } }
+        public long     MaxOffset { get { return m_file.MaxOffset; } }
+        public bool ExtendByteSign { get; protected set; }
 
         protected NcIndexReaderBase (ArcView file, int count)
         {
             m_input = file.CreateStream();
             m_dir = new List<Entry> (count);
             m_count = count;
-            m_max_offset = file.MaxOffset;
+            m_file = file;
             IndexPosition = 4;
+        }
+
+        public ArcFile Read (DatOpener format, Scheme scheme)
+        {
+            var file_map = format.ReadFilenameMap (scheme);
+            var dir = Read (file_map);
+            if (null == dir)
+                return null;
+            var master_key = scheme.IgnoreScriptKey ? 0ul : scheme.Hash;
+            return new ArcDatArchive (m_file, format, dir, master_key);
         }
 
         public List<Entry> Read (IDictionary<ulong, NameRecord> file_map)
         {
-            int skipped = 0;
+            int skipped = 0, last_reported = -1;
             string last_name = null;
             m_input.Position = IndexPosition;
             for (int i = 0; i < m_count; ++i)
@@ -299,38 +318,55 @@ namespace GameRes.Formats.NonColor
                     entry.Name = known_rec.Name;
                     entry.Type = FormatCatalog.Instance.GetTypeFromName (entry.Name);
                     entry.RawName = known_rec.NameBytes;
+                    if (null == last_name && i > 0)
+                    {
+                        Trace.WriteLine (string.Format ("[{0}] {1}", i, known_rec.Name), "[noncolor]");
+                        last_reported = i;
+                    }
+                }
+                else
+                {
+                    if (last_name != null && last_reported != i-1)
+                        Trace.WriteLine (string.Format ("[{0}] {1}", i-1, last_name), "[noncolor]");
+                    Trace.WriteLine (string.Format ("[{0}] Unknown hash {1:X08}", i, entry.Hash), "[noncolor]");
+                    last_name = null;
                 }
                 if (0 == (entry.Flags & 2))
                 {
                     if (null == known_rec.Name)
                     {
-                        if (last_name != null)
-                            Trace.WriteLine (string.Format ("[{0}] {1}", i-1, last_name), "[noncolor]");
-                        Trace.WriteLine (string.Format ("[{0}] Unknown hash {1:X8}", i, entry.Hash), "[noncolor]");
-                        last_name = null;
                         ++skipped;
                         continue;
                     }
                     else
                     {
                         var raw_name = known_rec.NameBytes;
-                        if (null == last_name && i > 0)
-                            Trace.WriteLine (string.Format ("[{0}] {1}", i, known_rec.Name), "[noncolor]");
-                        entry.Offset        ^= raw_name[raw_name.Length >> 1];
-                        entry.Size          ^= raw_name[raw_name.Length >> 2];
-                        entry.UnpackedSize  ^= raw_name[raw_name.Length >> 3];
+                        entry.Offset        ^= Extend8Bit (raw_name[raw_name.Length >> 1]);
+                        entry.Size          ^= Extend8Bit (raw_name[raw_name.Length >> 2]);
+                        entry.UnpackedSize  ^= Extend8Bit (raw_name[raw_name.Length >> 3]);
                     }
                 }
                 last_name = known_rec.Name;
                 if (!entry.CheckPlacement (MaxOffset))
-                    return null;
+                {
+                    Trace.WriteLine (string.Format ("{0}: invalid placement [key:{1:X8}] [{2:X8}:{3:X8}]", entry.Name, entry.Hash, entry.Offset, entry.Size));
+                    continue;
+                }
                 if (string.IsNullOrEmpty (entry.Name))
                     entry.Name = string.Format ("{0:D5}#{1:X8}", i, entry.Hash);
                 m_dir.Add (entry);
             }
             if (skipped != 0)
                 Trace.WriteLine (string.Format ("Missing {0} names", skipped), "[noncolor]");
+            if (0 == m_dir.Count)
+                return null;
             return m_dir;
+        }
+
+        uint Extend8Bit (byte v)
+        {
+            // 0xFF -> -1 -> 0xFFFFFFFF
+            return ExtendByteSign ? (uint)(int)(sbyte)v : v;
         }
 
         protected abstract ArcDatEntry ReadEntry ();
@@ -369,6 +405,7 @@ namespace GameRes.Formats.NonColor
             int flags  = m_input.ReadByte() ^ (byte)hash;
             return new ArcDatEntry {
                 Hash   = hash,
+                Flags  = flags,
                 Offset = m_input.ReadUInt32() ^ (uint)hash ^ m_master_key,
                 Size   = m_input.ReadUInt32() ^ (uint)hash,
                 UnpackedSize = m_input.ReadUInt32() ^ (uint)hash,

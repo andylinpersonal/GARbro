@@ -44,6 +44,12 @@ namespace GameRes.Formats.PalmTree
 
         static readonly byte[] ArDirSignature = { (byte)'A', (byte)'R', 5, 6 };
 
+        public ArcOpener ()
+        {
+            Settings = null;
+            Extensions = new string[] { "arc" };
+        }
+
         public override ArcFile TryOpen (ArcView file)
         {
             if (-1 == SearchForSignature (file, ArDirSignature))
@@ -60,10 +66,7 @@ namespace GameRes.Formats.PalmTree
             }
         }
 
-        public override ResourceOptions GetDefaultOptions ()
-        {
-            return null;
-        }
+        public override ResourceScheme Scheme { get; set; }
     }
 
     /// <summary>

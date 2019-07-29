@@ -1,49 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <GARbro>
     <Release>
-        <Version>1.5.34</Version>
+        <Version>1.5.44</Version>
         <Url>https://github.com/morkt/GARbro/releases/latest</Url>
-        <Notes>Lifted .Net framework requirement up to v4.6.
-Added GUI preferences window.
-New formats:
-- DAI_SYSTEM archives
-- PCG archives
-- LAX archives and 'CLS_TEXFILE' images
-- TPF archives
-- DREF images
-- DDS DXT3 textures
-- More KiriKiri and ShiinaRio encryption schemes
+        <Notes>New formats:
+- UMPK archives and GRC images
+- 'CsPack2' archives
+- UCG archives
+- IMGX images
+- FLK archives and BPA images
+- Jam Creation archives and DPO images
+- PAC0 archives and PCG0 images
+- CMB archives
+- PAK archives and SFG images
+- uGOS 'FC' and 'FD' images
+
+Updated KiriKiri encryption schemes.
 </Notes>
     </Release>
     <FormatsData>
-        <FileVersion>100</FileVersion>
-        <Url>https://github.com/morkt/GARbro/raw/c270574f52d4d509ada263df1e701d6eeeccd6d0/ArcFormats/Resources/Formats.dat</Url>
-        <Requires>
-            <Assembly Name="ArcFormats" Version="1.2.36.1546"/>
-            <Assembly Name="GameRes" Version="1.4.26.238"/>
-        </Requires>
-    </FormatsData>
-    <FormatsData>
-        <FileVersion>101</FileVersion>
-        <Url>https://github.com/morkt/GARbro/raw/6c0f4657ac22b5cf038c4f71f7caf148a3b603d2/ArcFormats/Resources/Formats.dat</Url>
-        <Requires>
-            <Assembly Name="ArcFormats" Version="1.2.37.1617"/>
-            <Assembly Name="GameRes" Version="1.4.26.238"/>
-        </Requires>
-    </FormatsData>
-    <FormatsData>
-        <FileVersion>102</FileVersion>
-        <Url>https://github.com/morkt/GARbro/raw/6460761487e76182d3151c3a521f9e89d382d109/ArcFormats/Resources/Formats.dat</Url>
-        <Requires>
-            <Assembly Name="ArcFormats" Version="1.2.38.1643"/>
-            <Assembly Name="GameRes" Version="1.4.26.238"/>
-        </Requires>
-    </FormatsData>
-    <FormatsData>
-        <FileVersion>104</FileVersion>
+        <FileVersion>148</FileVersion>
         <Url>https://github.com/morkt/GARbro/raw/master/ArcFormats/Resources/Formats.dat</Url>
         <Requires>
-            <Assembly Name="ArcFormats" Version="1.2.38.1669"/>
+            <Assembly Name="ArcFormats" Version="1.2.47.2146"/>
+            <Assembly Name="GameRes" Version="1.4.26.238"/>
+        </Requires>
+    </FormatsData>
+    <FormatsData>
+        <FileVersion>145</FileVersion>
+        <Url>https://github.com/morkt/GARbro/raw/c35ca8ec1f15edb9a32823014a3d532d9b4f5941/ArcFormats/Resources/Formats.dat</Url>
+        <Requires>
+            <Assembly Name="ArcFormats" Version="1.2.46.2120"/>
             <Assembly Name="GameRes" Version="1.4.26.238"/>
         </Requires>
     </FormatsData>

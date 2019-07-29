@@ -51,6 +51,7 @@ GUI Hotkeys
 <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd></td><td>   Hide menu bar</td></tr>
 <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></td><td>   Hide tool bar</td></tr>
 <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>   Hide status bar</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>       Toggle scaling of large images</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>Q</kbd></td><td>       Exit</td></tr>
 </table>
 
@@ -59,8 +60,8 @@ Author
 
 Written by [morkt](https://github.com/morkt/GARbro) under [MIT License](https://github.com/morkt/GARbro/blob/master/LICENSE).
 
-Korean translation by [mireado](https://github.com/mireado)
+Korean translation by [mireado](https://github.com/mireado), [overworks](https://github.com/overworks)
 
-Simplified Chinese translation by [tenyuhuang](https://github.com/tenyuhuang) and [PeratX](https://github.com/PeratX)
+Simplified Chinese translation by [elasticblitz](https://github.com/elasticblitz), [PeratX](https://github.com/PeratX) and [taroxd](https://github.com/taroxd)
 
 Japanese translation by [haniwa55](https://github.com/haniwa55)

@@ -566,4 +566,10 @@ Overwrite?</value>
   <data name="MsgRunning" xml:space="preserve">
     <value>GARBro is running...</value>
   </data>
+  <data name="TextViewer" xml:space="preserve">
+    <value>Image viewer</value>
+  </data>
+  <data name="winDownScaleImage" xml:space="preserve">
+    <value>Scale large images to fit window</value>
+  </data>
 </root>

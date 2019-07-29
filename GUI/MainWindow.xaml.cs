@@ -62,6 +62,8 @@ namespace GARbro.GUI
 
         public App App { get { return m_app; } }
 
+        internal static readonly GuiResourceSetting DownScaleImage = new GuiResourceSetting ("winDownScaleImage");
+
         const StringComparison StringIgnoreCase = StringComparison.CurrentCultureIgnoreCase;
 
         #region ADL
@@ -123,6 +125,7 @@ namespace GARbro.GUI
                     this.MinWidth = e.NewSize.Width+79;
                 }
             };
+            DownScaleImage.PropertyChanged += (s, e) => ApplyDownScaleSetting();
             pathLine.EnterKeyDown += acb_OnKeyDown;
 #region ADL
             var ico = new Icon(Application.GetResourceStream(new Uri("pack://application:,,,/images/sample.ico")).Stream);
@@ -1610,6 +1613,16 @@ namespace GARbro.GUI
             dialog.ShowDialog();
         }
 
+        private void ScaleImageExec (object sender, ExecutedRoutedEventArgs e)
+        {
+            DownScaleImage.Value = !DownScaleImage.Get<bool>();
+        }
+
+        private void CanExecuteScaleImage (object sender, CanExecuteRoutedEventArgs e)
+        {
+            e.CanExecute = ImageCanvas.Source != null;
+        }
+
         private void CanExecuteAlways (object sender, CanExecuteRoutedEventArgs e)
         {
             e.CanExecute = true;
@@ -1855,5 +1868,6 @@ namespace GARbro.GUI
         public static readonly RoutedCommand AudioNext = new RoutedCommand();
         public static readonly RoutedCommand AudioPrevious = new RoutedCommand();
 #endregion
+        public static readonly RoutedCommand ScaleImage = new RoutedCommand();
     }
 }

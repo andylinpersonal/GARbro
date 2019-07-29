@@ -2,7 +2,7 @@
 //! \date       Wed Sep 16 22:51:11 2015
 //! \brief      game resources formats catalog class.
 //
-// Copyright (C) 2014-2015 by morkt
+// Copyright (C) 2014-2018 by morkt
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to
@@ -41,11 +41,8 @@ namespace GameRes
         private static readonly FormatCatalog m_instance = new FormatCatalog();
 
         #pragma warning disable 649
-        [ImportMany(typeof(ArchiveFormat))]
         private IEnumerable<ArchiveFormat>  m_arc_formats;
-        [ImportMany(typeof(ImageFormat))]
         private IEnumerable<ImageFormat>    m_image_formats;
-        [ImportMany(typeof(AudioFormat))]
         private IEnumerable<AudioFormat>    m_audio_formats;
         [ImportMany(typeof(ScriptFormat))]
         private IEnumerable<ScriptFormat>   m_script_formats;
@@ -100,16 +97,22 @@ namespace GameRes
             //Create the CompositionContainer with the parts in the catalog
             using (var container = new CompositionContainer (catalog))
             {
+                m_arc_formats = ImportWithPriorities<ArchiveFormat> (container);
+                m_image_formats = ImportWithPriorities<ImageFormat> (container);
+                m_audio_formats = ImportWithPriorities<AudioFormat> (container);
                 //Fill the imports of this object
                 container.ComposeParts (this);
+
                 AddResourceImpl (m_image_formats, container);
                 AddResourceImpl (m_arc_formats, container);
                 AddResourceImpl (m_audio_formats, container);
                 AddResourceImpl (m_script_formats, container);
+
+                AddAliases (container);
             }
         }
 
-        private void AddResourceImpl (IEnumerable<IResource> formats, CompositionContainer container)
+        private void AddResourceImpl (IEnumerable<IResource> formats, ICompositionService container)
         {
             foreach (var impl in formats)
             {
@@ -130,6 +133,46 @@ namespace GameRes
                 foreach (var signature in impl.Signatures)
                 {
                     m_signature_map.Add (signature, impl);
+                }
+            }
+        }
+
+        private IEnumerable<Format> ImportWithPriorities<Format> (ExportProvider provider)
+        {
+            return provider.GetExports<Format, IResourceMetadata>()
+                    .OrderByDescending (f => f.Metadata.Priority)
+                    .Select (f => f.Value)
+                    .ToArray();
+        }
+
+        private void AddAliases (ExportProvider provider)
+        {
+            foreach (var alias in provider.GetExports<ResourceAlias, IResourceAliasMetadata>())
+            {
+                var metadata = alias.Metadata;
+                IEnumerable<IResource> target_list;
+                if (string.IsNullOrEmpty (metadata.Type))
+                    target_list = Formats;
+                else if ("archive" == metadata.Type)
+                    target_list = ArcFormats;
+                else if ("image" == metadata.Type)
+                    target_list = ImageFormats;
+                else if ("audio" == metadata.Type)
+                    target_list = AudioFormats;
+                else if ("script" == metadata.Type)
+                    target_list = ScriptFormats;
+                else
+                {
+                    System.Diagnostics.Trace.WriteLine ("Unknown resource type specified", metadata.Extension);
+                    continue;
+                }
+                var ext    = metadata.Extension;
+                var target = metadata.Target;
+                if (!string.IsNullOrEmpty (ext) && !string.IsNullOrEmpty (target))
+                {
+                    var target_res = target_list.FirstOrDefault (f => f.Tag == target);
+                    if (target_res != null)
+                        m_extension_map.Add (ext.ToUpperInvariant(), target_res);
                 }
             }
         }
@@ -196,6 +239,13 @@ namespace GameRes
         {
             var ext = new Lazy<string> (() => Path.GetExtension (filename).TrimStart ('.').ToLowerInvariant(), false);
             var tried = Enumerable.Empty<ResourceType>();
+            IEnumerable<string> preferred = null;
+            if (VFS.IsVirtual)
+            {
+                var arc_fs = VFS.Top as ArchiveFileSystem;
+                if (arc_fs != null)
+                    preferred = arc_fs.Source.ContainedFormats;
+            }
             for (;;)
             {
                 var range = LookupSignature<ResourceType> (signature);
@@ -204,6 +254,8 @@ namespace GameRes
                 // check formats that match filename extension first
                 if (range.Skip (1).Any()) // if range.Count() > 1
                     range = range.OrderByDescending (f => f.Extensions.Any (e => e == ext.Value));
+                if (preferred != null && preferred.Any())
+                    range = range.OrderByDescending (f => preferred.Contains (f.Tag));
                 foreach (var impl in range)
                 {
                     yield return impl;
@@ -222,22 +274,20 @@ namespace GameRes
         /// characters.</exception>
         public EntryType Create<EntryType> (string filename) where EntryType : Entry, new()
         {
-            EntryType entry = null;
-            var formats = LookupFileName (filename);
-            if (formats.Any())
-                entry = formats.First().Create<EntryType>();
-            if (null == entry)
-                entry = new EntryType();
-            entry.Name = filename;
-            return entry;
+            return new EntryType {
+                Name = filename,
+                Type = GetTypeFromName (filename),
+            };
         }
 
-        public string GetTypeFromName (string filename)
+        public string GetTypeFromName (string filename, IEnumerable<string> preferred_formats = null)
         {
             var formats = LookupFileName (filename);
-            if (formats.Any())
-                return formats.First().Type;
-            return "";
+            if (!formats.Any())
+                return "";
+            if (preferred_formats != null && preferred_formats.Any())
+                formats = formats.OrderByDescending (f => preferred_formats.Contains (f.Tag));
+            return formats.First().Type;
         }
 
         public void InvokeParametersRequest (object source, ParametersRequestEventArgs args)

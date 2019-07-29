@@ -43,10 +43,10 @@ namespace GameRes.Formats.Softpal
 
         public VafsOpener ()
         {
-            Extensions = new string[] { "052", "055", "058" };
+            Extensions = new string[] { "052", "054", "055", "056", "058" };
         }
 
-        static readonly Lazy<ImageFormat> s_PicFormat = new Lazy<ImageFormat> (() => ImageFormat.FindByTag ("PIC/SOFTPAL"));
+        static readonly ResourceInstance<ImageFormat> s_PicFormat = new ResourceInstance<ImageFormat> ("PIC/SOFTPAL");
 
         public override ArcFile TryOpen (ArcView file)
         {
@@ -59,7 +59,7 @@ namespace GameRes.Formats.Softpal
             {
                 var ext = Path.GetExtension (file.Name).TrimStart ('.');
                 int version;
-                if (int.TryParse (ext, out version) && version >= 55)
+                if (int.TryParse (ext, out version) && version >= 54)
                     return OpenTp055Arc (file);
                 else
                     return OpenTpArc (file);
@@ -368,18 +368,12 @@ namespace GameRes.Formats.Softpal
 
         static short[] LoadWaveTable (string name)
         {
-
-            var assembly = typeof(VafsOpener).Assembly;
-            using (var stream = assembly.GetManifestResourceStream ("GameRes.Formats.Softpal."+name))
-            {
-                if (null == stream)
-                    return null;
-                var src = new byte[stream.Length];
-                stream.Read (src, 0, src.Length);
-                var array = new short[src.Length/2];
-                Buffer.BlockCopy (src, 0, array, 0, src.Length);
-                return array;
-            }
+            var src = EmbeddedResource.Load (name, typeof(VafsOpener));
+            if (null == src)
+                return null;
+            var array = new short[src.Length/2];
+            Buffer.BlockCopy (src, 0, array, 0, src.Length);
+            return array;
         }
     }
 

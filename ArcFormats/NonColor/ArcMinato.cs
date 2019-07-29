@@ -38,7 +38,9 @@ namespace GameRes.Formats.Minato
 
         public override ulong ComputeHash (byte[] name)
         {
-            return Crc32.Compute (name, 0, name.Length);
+            var bytes = name.Clone() as byte[];
+            bytes.ToLowerShiftJis();
+            return Crc32.Compute (bytes, 0, bytes.Length);
         }
     }
 
@@ -68,19 +70,16 @@ namespace GameRes.Formats.Minato
                 return null;
 
             using (var index = new MinatoIndexReader (file, count))
-            {
-                var file_map = ReadFilenameMap (scheme);
-                var dir = index.Read (file_map);
-                if (null == dir)
-                    return null;
-                return new ArcDatArchive (file, this, dir, scheme.Hash);
-            }
+                return index.Read (this, scheme);
         }
     }
 
     internal class MinatoIndexReader : NcIndexReaderBase
     {
-        public MinatoIndexReader (ArcView file, int count) : base (file, count) { }
+        public MinatoIndexReader (ArcView file, int count) : base (file, count)
+        {
+            ExtendByteSign = true;
+        }
 
         protected override ArcDatEntry ReadEntry ()
         {

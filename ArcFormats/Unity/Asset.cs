@@ -28,11 +28,11 @@
 //
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text;
 using GameRes.Utility;
 
@@ -40,7 +40,6 @@ namespace GameRes.Formats.Unity
 {
     internal class Asset
     {
-        int                     m_header_size;
         int                     m_format;
         uint                    m_data_offset;
         bool                    m_is_little_endian;
@@ -58,7 +57,7 @@ namespace GameRes.Formats.Unity
 
         public void Load (AssetReader input)
         {
-            m_header_size  = input.ReadInt32();
+            input.ReadInt32();  // header_size
             input.ReadUInt32(); // file_size
             m_format = input.ReadInt32();
             m_data_offset  = input.ReadUInt32();
@@ -121,7 +120,7 @@ namespace GameRes.Formats.Unity
                 else
                 */
                 {
-                    Trace.WriteLine ("Unknown type id", obj.ClassId.ToString());
+                    Trace.WriteLine (string.Format ("Unknown type id {0}", obj.ClassId.ToString()), "[Unity.Asset]");
                     m_types[obj.TypeId] = null;
                 }
             }
@@ -199,18 +198,93 @@ namespace GameRes.Formats.Unity
                 reader.ReadByte();
         }
 
-        public string Type {
+        public string TypeName {
             get {
-                var type_tree = Asset.Tree.TypeTrees;
-                if (type_tree.ContainsKey (TypeId))
-                    return type_tree[TypeId].Type;
+                var type = this.Type;
+                if (type != null)
+                    return type.Type;
                 return string.Format ("[TypeId:{0}]", TypeId);
+            }
+        }
+
+        public TypeTree Type {
+            get {
+                TypeTree type;
+                Asset.Tree.TypeTrees.TryGetValue (TypeId, out type);
+                return type;
             }
         }
 
         public override string ToString ()
         {
             return string.Format ("<{0} {1}>", Type, ClassId);
+        }
+
+        public IDictionary Deserialize (AssetReader input)
+        {
+            var type_tree = Asset.Tree.TypeTrees;
+            if (!type_tree.ContainsKey (TypeId))
+                return null;
+            var type_map = new Hashtable();
+            var type = type_tree[TypeId];
+            foreach (var node in type.Children)
+            {
+                type_map[node.Name] = DeserializeType (input, node);
+            }
+            return type_map;
+        }
+
+        object DeserializeType (AssetReader input, TypeTree node)
+        {
+            object obj = null;
+            if (node.IsArray)
+            {
+                int size = input.ReadInt32();
+                var data_field = node.Children.FirstOrDefault (n => n.Name == "data");
+                if (data_field != null)
+                {
+                    if ("TypelessData" == node.Type)
+                        obj = input.ReadBytes (size * data_field.Size);
+                    else
+                        obj = DeserializeArray (input, size, data_field);
+                }
+            }
+            else if (node.Size < 0)
+            {
+                if (node.Type == "string")
+                {
+                    obj = input.ReadString();
+                    if (node.Children[0].IsAligned)
+                        input.Align();
+                }
+                else if (node.Type == "StreamingInfo")
+                {
+                    var info = new StreamingInfo();
+                    info.Load (input);
+                    obj = info;
+                }
+                else
+                    throw new NotImplementedException ("Unknown class encountered in asset deserialzation.");
+            }
+            else if ("int" == node.Type)
+                obj = input.ReadInt32();
+            else if ("unsigned int" == node.Type)
+                obj = input.ReadUInt32();
+            else if ("bool" == node.Type)
+                obj = input.ReadBool();
+            else
+                input.Position += node.Size;
+            if (node.IsAligned)
+                input.Align();
+            return obj;
+        }
+
+        object[] DeserializeArray (AssetReader input, int length, TypeTree elem)
+        {
+            var array = new object[length];
+            for (int i = 0; i < length; ++i)
+                array[i] = DeserializeType (input, elem);
+            return array;
         }
     }
 
@@ -228,6 +302,8 @@ namespace GameRes.Formats.Unity
         public int      Flags;
 
         public IList<TypeTree> Children { get { return m_children; } }
+
+        public bool           IsAligned { get { return (Flags & 0x4000) != 0; } }
 
         static readonly string          Null = "(null)";
         static readonly Lazy<byte[]>    StringsDat = new Lazy<byte[]> (() => LoadResource ("strings.dat"));
@@ -247,7 +323,20 @@ namespace GameRes.Formats.Unity
 
         void LoadRaw (AssetReader reader)
         {
-            throw new NotImplementedException();
+            Type = reader.ReadCString();
+            Name = reader.ReadCString();
+            Size = reader.ReadInt32();
+            Index = reader.ReadUInt32();
+            IsArray = reader.ReadInt32() != 0;
+            Version = reader.ReadInt32();
+            Flags = reader.ReadInt32();
+            int count = reader.ReadInt32();
+            for (int i = 0; i < count; ++i)
+            {
+                var child = new TypeTree (m_format);
+                child.Load (reader);
+                Children.Add (child);
+            }
         }
 
         byte[] m_data;
@@ -306,34 +395,23 @@ namespace GameRes.Formats.Unity
             return Binary.GetCString (strings, offset, strings.Length-offset, Encoding.UTF8);
         }
 
-        internal static Stream OpenResource (string name)
-        {
-            var qualified_name = ".Unity." + name;
-            var assembly = Assembly.GetExecutingAssembly();
-            var res_name = assembly.GetManifestResourceNames().Single (r => r.EndsWith (qualified_name));
-            Stream stream = assembly.GetManifestResourceStream (res_name);
-            if (null == stream)
-                throw new FileNotFoundException ("Resource not found.", name);
-            return stream;
-        }
-
         internal static byte[] LoadResource (string name)
         {
-            using (var stream = OpenResource (name))
-            {
-                var res = new byte[stream.Length];
-                stream.Read (res, 0, res.Length);
-                return res;
-            }
+            var res = EmbeddedResource.Load (name, typeof(TypeTree));
+            if (null == res)
+                throw new FileNotFoundException ("Resource not found.", name);
+            return res;
         }
     }
 
     internal class UnityTypeData
     {
+        string                      m_version;
         List<int>                   m_class_ids = new List<int> ();
         Dictionary<int, byte[]>     m_hashes = new Dictionary<int, byte[]> ();
         Dictionary<int, TypeTree>   m_type_trees = new Dictionary<int, TypeTree> ();
 
+        public string                       Version { get { return m_version; } }
         public IList<int>                  ClassIds { get { return m_class_ids; } }
         public IDictionary<int, byte[]>      Hashes { get { return m_hashes; } }
         public IDictionary<int, TypeTree> TypeTrees { get { return m_type_trees; } }
@@ -341,7 +419,7 @@ namespace GameRes.Formats.Unity
         public void Load (AssetReader reader)
         {
             int format = reader.Format;
-            var version = reader.ReadCString();
+            m_version = reader.ReadCString();
             var platform = reader.ReadInt32 ();
             if (format >= 13)
             {
@@ -384,62 +462,6 @@ namespace GameRes.Formats.Unity
                     m_type_trees[class_id] = tree;
                 }
             }
-        }
-    }
-
-    internal class AudioClip
-    {
-        public string   m_Name;
-        public int      m_LoadType;
-        public int      m_Channels;
-        public int      m_Frequency;
-        public int      m_BitsPerSample;
-        public float    m_Length;
-        public bool     m_IsTrackerFormat;
-        public int      m_SubsoundIndex;
-        public bool     m_PreloadAudioData;
-        public bool     m_LoadInBackground;
-        public bool     m_Legacy3D;
-        public string   m_Source;
-        public long     m_Offset;
-        public long     m_Size;
-        public int      m_CompressionFormat;
-
-        public void Load (AssetReader reader)
-        {
-            m_Name = reader.ReadString();
-            reader.Align();
-            m_LoadType = reader.ReadInt32();
-            m_Channels = reader.ReadInt32();
-            m_Frequency = reader.ReadInt32();
-            m_BitsPerSample = reader.ReadInt32();
-            m_Length = reader.ReadFloat();
-            m_IsTrackerFormat = reader.ReadBool();
-            reader.Align();
-            m_SubsoundIndex = reader.ReadInt32();
-            m_PreloadAudioData = reader.ReadBool();
-            m_LoadInBackground = reader.ReadBool();
-            m_Legacy3D = reader.ReadBool();
-            reader.Align();
-            m_Source = reader.ReadString();
-            reader.Align();
-            m_Offset = reader.ReadInt64();
-            m_Size = reader.ReadInt64();
-            m_CompressionFormat = reader.ReadInt32();
-        }
-    }
-
-    internal class StreamingInfo
-    {
-        public uint     Offset;
-        public uint     Size;
-        public string   Path;
-
-        public void Load (AssetReader reader)
-        {
-            Offset = reader.ReadUInt32();
-            Size = reader.ReadUInt32();
-            Path = reader.ReadString();
         }
     }
 }

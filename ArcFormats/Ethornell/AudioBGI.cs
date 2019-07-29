@@ -38,7 +38,8 @@ namespace GameRes.Formats.BGI
 
         public BgiAudio ()
         {
-            Extensions = new string[] { "" };
+            Signatures = new uint[] { 0x40, 0 };
+            Extensions = new string[] { "bw", "", "_bw" };
         }
         
         public override SoundInput TryOpen (IBinaryStream file)

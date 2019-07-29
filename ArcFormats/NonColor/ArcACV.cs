@@ -23,12 +23,7 @@
 // IN THE SOFTWARE.
 //
 
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.Composition;
-using System.IO;
-using GameRes.Compression;
-using GameRes.Utility;
 
 namespace GameRes.Formats.NonColor
 {
@@ -57,37 +52,8 @@ namespace GameRes.Formats.NonColor
             if (null == scheme)
                 return null;
 
-            bool is_script = VFS.IsPathEqualsToFileName (file.Name, "script.dat");
-
             using (var index = new NcIndexReader (file, count, key) { IndexPosition = 8 })
-            {
-                var file_map = ReadFilenameMap (scheme);
-                var dir = index.Read (file_map);
-                if (null == dir)
-                    return null;
-                if (is_script)
-                {
-                    foreach (ArcDatEntry entry in dir)
-                        entry.Hash ^= scheme.Hash;
-                }
-                return new ArcFile (file, this, dir);
-            }
-        }
-
-        public override Stream OpenEntry (ArcFile arc, Entry entry)
-        {
-            var dent = entry as ArcDatEntry;
-            if (null == dent || 0 == dent.Size)
-                return arc.File.CreateStream (entry.Offset, entry.Size);
-            var data = arc.File.View.ReadBytes (entry.Offset, entry.Size);
-            if (dent.IsPacked)
-            {
-                DecryptData (data, (uint)dent.Hash);
-                return new ZLibStream (new MemoryStream (data), CompressionMode.Decompress);
-            }
-            if (dent.RawName != null && 0 != dent.Flags)
-                DecryptWithName (data, dent.RawName);
-            return new BinMemoryStream (data, entry.Name);
+                return index.Read (this, scheme);
         }
     }
 }

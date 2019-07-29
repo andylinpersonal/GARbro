@@ -87,6 +87,11 @@ namespace GameRes.Formats.KiriKiri
             TpmFileName = scheme.TpmFileName;
         }
 
+        public override string ToString ()
+        {
+            return string.Format ("{0}(0x{1:X}, 0x{2:X})", base.ToString(), m_mask, m_offset);
+        }
+
         static readonly byte[] s_ctl_block_signature = Encoding.ASCII.GetBytes (" Encryption control block");
 
         /// <summary>
@@ -183,7 +188,7 @@ namespace GameRes.Formats.KiriKiri
             uint key2 = ret.Item2 & 0xffff;
             byte key3 = (byte)(ret.Item1);
             if (key1 == key2)
-                key2 = (key2+1) & 0xffff;
+                key2 += 1;
             if (0 == key3)
                 key3 = 1;
 

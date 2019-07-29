@@ -45,7 +45,7 @@ namespace GameRes.Formats.Unity
 
         public UnityFSOpener ()
         {
-            Extensions = new string[] { "", "unity3d" };
+            Extensions = new string[] { "", "unity3d", "asset" };
         }
 
         public override ArcFile TryOpen (ArcView file)
@@ -99,7 +99,7 @@ namespace GameRes.Formats.Unity
             using (var input = new BinMemoryStream (index_data))
                 index.Parse (input);
             var dir = index.LoadObjects();
-            return new UnityBundle (file, this, dir, index.Segments);
+            return new UnityBundle (file, this, dir, index.Segments, index.Bundles);
         }
 
         public override Stream OpenEntry (ArcFile arc, Entry entry)
@@ -122,15 +122,39 @@ namespace GameRes.Formats.Unity
         public override IImageDecoder OpenImage (ArcFile arc, Entry entry)
         {
             var aent = entry as AssetEntry;
-            if (null == aent || aent.AssetObject.Type != "Texture2D")
+            if (null == aent || aent.AssetObject.TypeName != "Texture2D")
                 return base.OpenImage (arc, entry);
             var uarc = (UnityBundle)arc;
             var obj = aent.AssetObject;
-            Stream input = new BundleStream (uarc.File, uarc.Segments);
-            input = new StreamRegion (input, obj.Offset, obj.Size);
+            var bundles = new BundleStream (uarc.File, uarc.Segments);
+            var input = new StreamRegion (bundles, obj.Offset, obj.Size);
             var reader = new AssetReader (input, entry.Name);
             reader.SetupReaders (obj.Asset);
-            return new Texture2DDecoder (reader);
+            Texture2D tex = null;
+            var type = obj.Type;
+            if (type != null && type.Children.Any (t => t.Type == "StreamingInfo"))
+            {
+                var fields = obj.Deserialize (reader);
+                tex = new Texture2D();
+                tex.Import (fields);
+                var info = fields["m_StreamData"] as StreamingInfo;
+                if (info != null)
+                {
+                    var bundle = uarc.Bundles.FirstOrDefault (b => VFS.IsPathEqualsToFileName (info.Path, b.Name));
+                    if (bundle != null)
+                    {
+                        tex.m_DataLength = (int)info.Size;
+                        input = new StreamRegion (bundles, bundle.Offset+info.Offset, info.Size);
+                        reader = new AssetReader (input, entry.Name);
+                    }
+                }
+            }
+            if (null == tex)
+            {
+                tex = new Texture2D();
+                tex.Load (reader);
+            }
+            return new Texture2DDecoder (tex, reader);
         }
 
         internal static byte[] UnpackLzma (byte[] input, int unpacked_size)
@@ -164,11 +188,13 @@ namespace GameRes.Formats.Unity
     internal class UnityBundle : ArcFile
     {
         public readonly List<BundleSegment> Segments;
+        public readonly List<BundleEntry>   Bundles;
 
-        public UnityBundle (ArcView arc, ArchiveFormat impl, ICollection<Entry> dir, List<BundleSegment> segments)
+        public UnityBundle (ArcView arc, ArchiveFormat impl, ICollection<Entry> dir, List<BundleSegment> segments, List<BundleEntry> bundles)
             : base (arc, impl, dir)
         {
             Segments = segments;
+            Bundles = bundles;
         }
     }
 
@@ -191,6 +217,7 @@ namespace GameRes.Formats.Unity
         List<BundleEntry>   m_bundles;
 
         public List<BundleSegment> Segments { get { return m_segments; } }
+        public List<BundleEntry>    Bundles { get { return m_bundles; } }
 
         public AssetDeserializer (ArcView file, long data_offset)
         {
@@ -237,7 +264,7 @@ namespace GameRes.Formats.Unity
             {
                 foreach (BundleEntry bundle in m_bundles)
                 {
-                    if (bundle.Name.EndsWith (".resource"))
+                    if (bundle.Name.HasAnyOfExtensions (".resource", ".resS"))
                         continue;
                     using (var asset_stream = new StreamRegion (stream, bundle.Offset, bundle.Size, true))
                     using (var reader = new AssetReader (asset_stream, bundle.Name))
@@ -273,6 +300,8 @@ namespace GameRes.Formats.Unity
             foreach (var obj in asset.Objects)
             {
                 var entry = ReadAsset (file, obj);
+                if (null == entry)
+                    continue;
                 if (null == entry.Bundle)
                     entry.Bundle = bundle;
                 string name;
@@ -287,13 +316,15 @@ namespace GameRes.Formats.Unity
 
         AssetEntry ReadAsset (Stream file, UnityObject obj)
         {
-            string type = obj.Type;
+            string type = obj.TypeName;
             if ("AudioClip" == type)
                 return ReadAudioClip (file, obj);
             else if ("TextAsset" == type)
                 return ReadTextAsset (file, obj);
             else if ("Texture2D" == type)
                 type = "image";
+            else if ("AssetBundle" == type)
+                return null;
 
             return new AssetEntry {
                 Type = type,
@@ -334,8 +365,8 @@ namespace GameRes.Formats.Unity
 
         string GetObjectName (Stream input, UnityObject obj)
         {
-            TypeTree type;
-            if (obj.Asset.Tree.TypeTrees.TryGetValue (obj.TypeId, out type) && type.Children.Count > 0)
+            var type = obj.Type;
+            if (type != null && type.Children.Count > 0)
             {
                 var first_field = type.Children[0];
                 if ("m_Name" == first_field.Name && "string" == first_field.Type)
@@ -353,8 +384,7 @@ namespace GameRes.Formats.Unity
 
         AssetEntry ReadTextAsset (Stream input, UnityObject obj)
         {
-            var type_def = obj.Asset.Tree.TypeTrees[obj.TypeId];
-            var script = type_def.Children.FirstOrDefault (f => f.Name == "m_Script");
+            var script = obj.Type.Children.FirstOrDefault (f => f.Name == "m_Script");
             if (null == script)
                 return null;
             using (var reader = obj.Open (input))

@@ -274,6 +274,21 @@ namespace GameRes.Formats.Triangle
             m_size = input_length;
         }
 
+        public void UnpackV2 ()
+        {
+            int src = 0;
+            int dst = 0;
+            while (dst < m_output.Length && src < m_size)
+            {
+                byte b = m_input.ReadByte();
+                int count = m_input.ReadByte();
+                src += 2;
+                count = Math.Min (count, m_output.Length - dst);
+                for (int i = 0; i < count; i++)
+                    m_output[dst++] = b;
+            }
+        }
+
         public void Unpack ()
         {
             int src = 0;

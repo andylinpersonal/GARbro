@@ -23,10 +23,10 @@
 // IN THE SOFTWARE.
 //
 
-using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.IO;
+using GameRes.Compression;
 using GameRes.Utility;
 
 namespace GameRes.Formats.Seraphim
@@ -47,8 +47,7 @@ namespace GameRes.Formats.Seraphim
 
         public override ArcFile TryOpen (ArcView file)
         {
-            string name = Path.GetFileName (file.Name);
-            if (!name.Equals ("SCNPAC.DAT", StringComparison.InvariantCultureIgnoreCase))
+            if (!VFS.IsPathEqualsToFileName (file.Name, "SCNPAC.DAT"))
                 return null;
             int count = file.View.ReadInt32 (0);
             if (!IsSaneCount (count))
@@ -80,19 +79,36 @@ namespace GameRes.Formats.Seraphim
         {
             if (0 == entry.Size)
                 return Stream.Null;
-            var input = arc.File.CreateStream (entry.Offset, entry.Size);
-            if (0 == input.Signature || 0 != (input.Signature & 0xFF000000))
-                return input;
+            uint signature = arc.File.View.ReadUInt32 (entry.Offset);
+            IBinaryStream input;
+            if (1 == signature && 0x78 == arc.File.View.ReadByte (entry.Offset+4))
+            {
+                input = arc.File.CreateStream (entry.Offset+4, entry.Size-4);
+                return new ZLibStream (input.AsStream, CompressionMode.Decompress);
+            }
+            input = arc.File.CreateStream (entry.Offset, entry.Size);
+            if (signature < 4 || 0 != (signature & 0xFF000000))
+            {
+                if (0x78 == (signature & 0xFF))
+                {
+                    var compr = new ZLibStream (input.AsStream, CompressionMode.Decompress);
+                    input = new BinaryStream (compr, entry.Name);
+                }
+                else
+                    return input.AsStream;
+            }
             try
             {
                 var data = LzDecompress (input);
-                input.Dispose();
                 return new BinMemoryStream (data, entry.Name);
             }
             catch
             {
-                input.Position = 0;
-                return input;
+                return arc.File.CreateStream (entry.Offset, entry.Size);
+            }
+            finally
+            {
+                input.Dispose();
             }
         }
 

@@ -46,7 +46,7 @@ namespace GameRes.Formats.uGOS
         public DetBmpFormat ()
         {
             Extensions = new string[] { "bmp" };
-            Signatures = new uint[] { 0x206546, 0x186546, 0x01186446, 0x186446, 0 };
+            Signatures = new uint[] { 0x206546, 0x186546, 0x086546, 0 };
         }
 
         public override ImageMetaData ReadMetaData (IBinaryStream stream)
@@ -55,10 +55,10 @@ namespace GameRes.Formats.uGOS
             if (header[0] != 'F')
                 return null;
             var type = header[1] & 0x5F;
-            if (type != 'D' && type != 'E')
+            if (type != 'E')
                 return null;
             int bpp = header[2];
-            if (bpp != 0x18 && bpp != 0x20)
+            if (bpp != 8 && bpp != 0x18 && bpp != 0x20)
                 return null;
             return new DetBmpMetaData
             {
@@ -71,11 +71,9 @@ namespace GameRes.Formats.uGOS
 
         public override ImageData Read (IBinaryStream file, ImageMetaData info)
         {
-            using (var reader = new Reader (file, (DetBmpMetaData)info))
-            {
-                reader.Unpack();
-                return ImageData.CreateFlipped (info, reader.Format, null, reader.Data, reader.Stride);
-            }
+            var reader = new Reader (file, (DetBmpMetaData)info);
+            reader.Unpack();
+            return ImageData.CreateFlipped (info, reader.Format, null, reader.Data, reader.Stride);
         }
 
         public override void Write (Stream file, ImageData image)
@@ -83,7 +81,7 @@ namespace GameRes.Formats.uGOS
             throw new System.NotImplementedException ("DetBmpFormat.Write not implemented");
         }
 
-        internal sealed class Reader : IDisposable
+        internal sealed class Reader
         {
             IBinaryStream   m_input;
             byte[]          m_output;
@@ -253,15 +251,26 @@ namespace GameRes.Formats.uGOS
                     dst = 3;
                     while (dst < m_output.Length)
                     {
-                        byte alpha = sub_415530(8);
-                        int count = sub_415440() + 1;
-                        while (count > 0)
+                        byte alpha = ReadBits (8);
+                        int count = ReadCount() + 1;
+                        while (count --> 0)
                         {
                             m_output[dst] = alpha;
                             dst += 4;
-                            --count;
                         }
                     }
+                }
+                else if (8 == m_bpp)
+                {
+                    var pixels = new byte[m_width * m_height];
+                    dst = 0;
+                    for (int src = 0; src < m_output.Length; src += 4)
+                    {
+                        pixels[dst++] = m_output[src];
+                    }
+                    m_output = pixels;
+                    Format = PixelFormats.Gray8;
+                    Stride = m_width;
                 }
             }
 
@@ -297,7 +306,7 @@ namespace GameRes.Formats.uGOS
                 return (int)(m_bits >> 8);
             }
 
-            byte sub_415530 (int a3)
+            byte ReadBits (int a3)
             {
                 m_bits &= 0xFF;
                 int v4 = byte_4CBA80[m_bits];
@@ -327,7 +336,7 @@ namespace GameRes.Formats.uGOS
                 return (byte)alpha;
             }
 
-            int sub_415440 ()
+            int ReadCount ()
             {
                 m_bits &= 0xFF;
                 int v2 = (int)m_bits;
@@ -440,12 +449,6 @@ namespace GameRes.Formats.uGOS
                     dword_4CB750[i] = OffsetsX[i] + m_width * OffsetsY[i];
                 }
             }
-
-            #region IDisposable Members
-            public void Dispose ()
-            {
-            }
-            #endregion
         }
     }
 }

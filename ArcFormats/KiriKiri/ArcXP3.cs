@@ -89,6 +89,7 @@ namespace GameRes.Formats.KiriKiri
         public Xp3Opener ()
         {
             Signatures = new uint[] { 0x0d335058, 0 };
+            ContainedFormats = new[] { "TLG", "BMP", "PNG", "JPEG", "OGG", "WAV", "TXT" };
         }
         
         static readonly byte[] s_xp3_header = {
@@ -160,7 +161,12 @@ namespace GameRes.Formats.KiriKiri
                             long section_size = header.ReadInt64();
                             entry_size -= 12;
                             if (section_size > entry_size)
-                                break;
+                            {
+                                // allow "info" sections with wrong size
+                                if (section != 0x6f666e69)
+                                    break;
+                                section_size = entry_size;
+                            }
                             entry_size -= section_size;
                             long next_section_pos = header.BaseStream.Position + section_size;
                             switch (section)
@@ -202,7 +208,7 @@ namespace GameRes.Formats.KiriKiri
                                     goto NextEntry;
                                 }
                                 entry.Name = name;
-                                entry.Type = FormatCatalog.Instance.GetTypeFromName (name);
+                                entry.Type = FormatCatalog.Instance.GetTypeFromName (name, ContainedFormats);
                                 entry.IsEncrypted = !(entry.Cipher is NoCrypt)
                                     && !(entry.Cipher.StartupTjsNotEncrypted && "startup.tjs" == name);
                                 break;
@@ -248,6 +254,21 @@ namespace GameRes.Formats.KiriKiri
                                 DeobfuscateEntry (entry);
                             }
                             dir.Add (entry);
+                        }
+                    }
+                    else if (0x3A == (entry_signature >> 24)) // "yuz:" || "sen:" || "dls:"
+                    {
+                        if (entry_size >= 0x10 && crypt_algorithm.Value is SenrenCxCrypt)
+                        {
+                            long offset = header.ReadInt64() + base_offset;
+                            header.ReadUInt32(); // unpacked size
+                            uint size = header.ReadUInt32();
+                            if (offset > 0 && offset + size <= file.MaxOffset)
+                            {
+                                var yuz = file.View.ReadBytes (offset, size);
+                                var crypt = crypt_algorithm.Value as SenrenCxCrypt;
+                                crypt.ReadYuzNames (yuz, filename_map);
+                            }
                         }
                     }
                     else if (entry_size > 7)
@@ -662,6 +683,8 @@ NextEntry:
         {
             var title = FormatCatalog.Instance.LookupGame (file.Name);
             if (string.IsNullOrEmpty (title))
+                title = FormatCatalog.Instance.LookupGame (file.Name, @"..\*.exe");
+            if (string.IsNullOrEmpty (title))
                 return null;
             ICrypt algorithm;
             if (!KnownSchemes.TryGetValue (title, out algorithm) && NoCryptTitles.Contains (title))
@@ -836,6 +859,11 @@ NextEntry:
             m_md5_map[GetMd5Hash (filename)] = filename;
         }
 
+        public void AddShortcut (string shortcut, string filename)
+        {
+            m_md5_map[shortcut] = filename;
+        }
+
         public string Get (uint hash, string md5)
         {
             string filename;
@@ -866,4 +894,14 @@ NextEntry:
             }
         }
     }
+
+    [Export(typeof(ResourceAlias))]
+    [ExportMetadata("Extension", "ANM")]
+    [ExportMetadata("Target", "TXT")]
+    public class AnmFormat : ResourceAlias { }
+
+    [Export(typeof(ResourceAlias))]
+    [ExportMetadata("Extension", "ASD")]
+    [ExportMetadata("Target", "TXT")]
+    public class AsdFormat : ResourceAlias { }
 }

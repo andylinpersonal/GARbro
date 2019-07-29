@@ -26,6 +26,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace GameRes
 {
@@ -41,7 +42,25 @@ namespace GameRes
         /// </summary>
         public abstract bool IsHierarchic { get; }
 
+        /// <summary>
+        /// Tags of formats related to this archive format (could be null).
+        /// </summary>
+        public IEnumerable<string> ContainedFormats { get; protected set; }
+
         public abstract ArcFile TryOpen (ArcView view);
+
+        /// <summary>
+        /// Create GameRes.Entry corresponding to <paramref name="filename"/> extension.
+        /// </summary>
+        /// <exception cref="System.ArgumentException">May be thrown if filename contains invalid
+        /// characters.</exception>
+        public EntryType Create<EntryType> (string filename) where EntryType : Entry, new()
+        {
+            return new EntryType {
+                Name = filename,
+                Type = FormatCatalog.Instance.GetTypeFromName (filename, ContainedFormats),
+            };
+        }
 
         /// <summary>
         /// Extract file referenced by <paramref name="entry"/> into current directory.
@@ -49,7 +68,7 @@ namespace GameRes
         public void Extract (ArcFile file, Entry entry)
         {
             using (var input = OpenEntry (file, entry))
-            using (var output = CreateFile (entry.Name))
+            using (var output = PhysicalFileSystem.CreateFile (entry.Name))
                 input.CopyTo (output);
         }
 
@@ -58,7 +77,10 @@ namespace GameRes
         /// </summary>
         public virtual Stream OpenEntry (ArcFile arc, Entry entry)
         {
-            return arc.File.CreateStream (entry.Offset, entry.Size, entry.Name);
+            if (entry.Size > 0)
+                return arc.File.CreateStream (entry.Offset, entry.Size, entry.Name);
+            else
+                return Stream.Null;
         }
 
         /// <summary>
@@ -67,49 +89,7 @@ namespace GameRes
         public virtual IImageDecoder OpenImage (ArcFile arc, Entry entry)
         {
             var input = arc.OpenBinaryEntry (entry);
-            try
-            {
-                return new ImageFormatDecoder (input);
-            }
-            catch
-            {
-                input.Dispose();
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Create file corresponding to <paramref name="entry"/> in current directory and open it
-        /// for writing. Overwrites existing file, if any.
-        /// </summary>
-        static public Stream CreateFile (string filename)
-        {
-            filename = CreatePath (filename);
-            return File.Create (filename);
-        }
-
-        static public string CreatePath (string filename)
-        {
-            string dir = Path.GetDirectoryName (filename);
-            if (!string.IsNullOrEmpty (dir)) // check for malformed filenames
-            {
-                string root = Path.GetPathRoot (dir);
-                if (!string.IsNullOrEmpty (root))
-                {
-                    dir = dir.Substring (root.Length); // strip root
-                }
-                string cwd = Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar;
-                dir = Path.GetFullPath (dir);
-                filename = Path.GetFileName (filename);
-                // check whether filename would reside within current directory
-                if (dir.StartsWith (cwd, StringComparison.OrdinalIgnoreCase))
-                {
-                    // path looks legit, create it
-                    Directory.CreateDirectory (dir);
-                    filename = Path.Combine (dir, filename);
-                }
-            }
-            return filename;
+            return ImageFormatDecoder.Create (input);
         }
 
         /// <summary>

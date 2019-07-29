@@ -2,7 +2,7 @@
 //! \date       Sun Jul 06 06:34:56 2014
 //! \brief      preview images.
 //
-// Copyright (C) 2014-2015 by morkt
+// Copyright (C) 2014-2018 by morkt
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to
@@ -61,7 +61,7 @@ namespace GARbro.GUI
                 m_active_viewer = value;
                 m_active_viewer.Visibility = Visibility.Visible;
                 bool exists = false;
-                foreach (var c in PreviewPane.Children.Cast<UIElement>())
+                foreach (UIElement c in PreviewPane.Children)
                 {
                     if (c != m_active_viewer)
                         c.Visibility = Visibility.Collapsed;
@@ -99,17 +99,30 @@ namespace GARbro.GUI
         private IEnumerable<Encoding> m_encoding_list = GetEncodingList();
         public IEnumerable<Encoding> TextEncodings { get { return m_encoding_list; } }
 
-        private static IEnumerable<Encoding> GetEncodingList ()
+        internal static IEnumerable<Encoding> GetEncodingList (bool exclude_utf16 = false)
         {
             var list = new HashSet<Encoding>();
-            list.Add (Encoding.Default);
-            var oem = CultureInfo.CurrentCulture.TextInfo.OEMCodePage;
-            list.Add (Encoding.GetEncoding (oem));
+            try 
+            {
+                list.Add(Encoding.Default);
+                var oem = CultureInfo.CurrentCulture.TextInfo.OEMCodePage;
+                list.Add(Encoding.GetEncoding(oem));
+            } 
+            catch (Exception X) 
+            {
+                if (X is ArgumentException || X is NotSupportedException) 
+                    list.Add(Encoding.GetEncoding(20127)); //default to US-ASCII
+                else 
+                    throw;
+            }
             list.Add (Encoding.GetEncoding (932));
             list.Add (Encoding.GetEncoding (936));
             list.Add (Encoding.UTF8);
-            list.Add (Encoding.Unicode);
-            list.Add (Encoding.BigEndianUnicode);
+            if (!exclude_utf16)
+            {
+                list.Add (Encoding.Unicode);
+                list.Add (Encoding.BigEndianUnicode);
+            }
             return list;
         }
  
@@ -160,11 +173,9 @@ namespace GARbro.GUI
             SetStatusText ("");
             var vm = ViewModel;
             m_current_preview = new PreviewFile { Path = vm.Path, Name = entry.Name, Entry = entry };
-            ImageCanvas.Source = null;
-            TextView.Clear();
             if (!IsPreviewPossible (entry))
             {
-                ActiveViewer = ImageView;
+                ResetPreviewPane();
                 return;
             }
             if ("image" != entry.Type)
@@ -213,6 +224,7 @@ namespace GARbro.GUI
             }
             catch (Exception X)
             {
+                ResetPreviewPane();
                 SetStatusText (X.Message);
             }
             finally
@@ -233,6 +245,7 @@ namespace GARbro.GUI
             }
             catch (Exception X)
             {
+                Dispatcher.Invoke (ResetPreviewPane);
                 SetStatusText (X.Message);
             }
         }
@@ -256,6 +269,7 @@ namespace GARbro.GUI
                 {
                     ActiveViewer = ImageView;
                     ImageCanvas.Source = bitmap;
+                    ApplyDownScaleSetting();
                     SetStatusText (string.Format (guiStrings.MsgImageSize, bitmap.PixelWidth,
                                                   bitmap.PixelHeight, bitmap.Format.BitsPerPixel));
                 }
@@ -285,6 +299,43 @@ namespace GARbro.GUI
                     ContentGrid.Height = double.NaN;
                 }, DispatcherPriority.ContextIdle);
             }
+        }
+
+        private void SetImageScaleMode (bool scale)
+        {
+            if (scale)
+            {
+                ImageCanvas.Stretch = Stretch.Uniform;
+                RenderOptions.SetBitmapScalingMode (ImageCanvas, BitmapScalingMode.HighQuality);
+                ImageView.VerticalScrollBarVisibility = ScrollBarVisibility.Disabled;
+                ImageView.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
+            }
+            else
+            {
+                ImageCanvas.Stretch = Stretch.None;
+                RenderOptions.SetBitmapScalingMode (ImageCanvas, BitmapScalingMode.NearestNeighbor);
+                ImageView.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+                ImageView.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
+            }
+        }
+
+        private void ApplyDownScaleSetting ()
+        {
+            bool image_need_scale = DownScaleImage.Get<bool>();
+            if (image_need_scale && ImageCanvas.Source != null)
+            {
+                var image = ImageCanvas.Source;
+                image_need_scale = image.Width > ImageView.ActualWidth || image.Height > ImageView.ActualHeight;
+            }
+            SetImageScaleMode (image_need_scale);
+        }
+
+        private void PreviewSizeChanged (object sender, SizeChangedEventArgs e)
+        {
+            var image = ImageCanvas.Source;
+            if (null == image || !DownScaleImage.Get<bool>())
+                return;
+            SetImageScaleMode (image.Width > e.NewSize.Width || image.Height > e.NewSize.Height);
         }
     }
 }

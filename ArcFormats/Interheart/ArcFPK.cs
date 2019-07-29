@@ -40,6 +40,12 @@ namespace GameRes.Formats.CandySoft
         public override bool  IsHierarchic { get { return false; } }
         public override bool      CanWrite { get { return false; } }
 
+        public FpkOpener ()
+        {
+            Signatures = new uint[] { 0, 1 };
+            ContainedFormats = new[] { "BMP", "KG", "OGG", "SCR", "TXT" };
+        }
+
         public override ArcFile TryOpen (ArcView file)
         {
             if (file.MaxOffset < 0x10)
@@ -76,16 +82,17 @@ namespace GameRes.Formats.CandySoft
             uint index_size = (uint)((8 + name_size) * count);
             if (index_size > file.View.Reserve (index_offset, index_size))
                 return null;
+            uint data_offset = 4 + index_size;
             var dir = new List<Entry> (count);
             for (int i = 0; i < count; ++i)
             {
                 string name = file.View.ReadString (index_offset+8, (uint)name_size);
                 if (string.IsNullOrWhiteSpace (name))
                     return null;
-                var entry = FormatCatalog.Instance.Create<Entry> (name);
+                var entry = Create<Entry> (name);
                 entry.Offset = file.View.ReadUInt32 (index_offset);
                 entry.Size   = file.View.ReadUInt32 (index_offset+4);
-                if (entry.Offset < index_size || !entry.CheckPlacement (file.MaxOffset))
+                if (entry.Offset < data_offset || !entry.CheckPlacement (file.MaxOffset))
                     return null;
                 dir.Add (entry);
                 index_offset += 8 + name_size;
@@ -95,7 +102,6 @@ namespace GameRes.Formats.CandySoft
 
         private List<Entry> ReadEncryptedIndex (ArcView file, int count)
         {
-            file.View.Reserve (file.MaxOffset-8, 8);
             uint index_offset = file.View.ReadUInt32 (file.MaxOffset-4);
             if (index_offset < 4 || index_offset >= file.MaxOffset-8)
                 return null;
@@ -115,7 +121,7 @@ namespace GameRes.Formats.CandySoft
                 string name = Binary.GetCString (index, index_pos+8, name_size);
                 if (string.IsNullOrWhiteSpace (name))
                     return null;
-                var entry = FormatCatalog.Instance.Create<Entry> (name);
+                var entry = Create<Entry> (name);
                 entry.Offset = LittleEndian.ToUInt32 (index, index_pos);
                 entry.Size   = LittleEndian.ToUInt32 (index, index_pos+4);
                 if (!entry.CheckPlacement (file.MaxOffset))
@@ -205,4 +211,9 @@ namespace GameRes.Formats.CandySoft
         }
         #endregion
     }
+
+    [Export(typeof(ResourceAlias))]
+    [ExportMetadata("Extension", "SPT")]
+    [ExportMetadata("Target", "SCR")]
+    public class SptFormat : ResourceAlias { }
 }

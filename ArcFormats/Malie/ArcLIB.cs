@@ -27,6 +27,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.IO;
+using GameRes.Compression;
 using GameRes.Utility;
 
 namespace GameRes.Formats.Malie
@@ -134,7 +135,7 @@ namespace GameRes.Formats.Malie
         public DatOpener ()
         {
             Extensions = new string[] { "lib", "dat" };
-            Signatures = new uint[] { 0, 0x3F503FB1, 0xC237434E, 0x8CD11522, 0x09D411A7, 0xAAC48CAA };
+            Signatures = new uint[] { 0, 0x3F503FB1, 0xC237434E, 0x8CD11522, 0x09D411A7, 0xAAC48CAA, 0x9FC2BCB1, 0xAAC900A3 };
         }
 
         public override ArcFile TryOpen (ArcView file)
@@ -167,8 +168,34 @@ namespace GameRes.Formats.Malie
             var march = arc as MalieArchive;
             if (null == march)
                 return arc.File.CreateStream (entry.Offset, entry.Size);
-            var input = new EncryptedStream (march.File, march.Decryptor);
-            return new StreamRegion (input, entry.Offset, entry.Size);
+            Stream input = new EncryptedStream (march.File, march.Decryptor);
+            input = new StreamRegion (input, entry.Offset, entry.Size);
+            if (entry.Name.HasExtension (".txtz"))
+            {
+                input = new ZLibStream (input, CompressionMode.Decompress);
+            }
+            else if (entry.Name.HasExtension (".psbz"))
+            {
+                input = UnpackPsbz (input);
+            }
+            return input;
+        }
+
+        Stream UnpackPsbz (Stream input)
+        {
+            var header = new byte[8];
+            input.Read (header, 0, 8);
+            if (!header.AsciiEqual ("PSBZ"))
+            {
+                input.Position = 0;
+                return input;
+            }
+            int unpacked_size = header.ToInt32 (4);
+            var output = new MemoryStream (unpacked_size);
+            using (input = new ZLibStream (input, CompressionMode.Decompress))
+                input.CopyTo (output);
+            output.Position = 0;
+            return output;
         }
 
         internal abstract class LibIndexReader : ILibIndexReader

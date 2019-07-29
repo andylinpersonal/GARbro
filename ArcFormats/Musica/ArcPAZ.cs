@@ -39,48 +39,28 @@ namespace GameRes.Formats.Musica
         public byte[]   Key;
     }
 
-    internal abstract class PazArchiveBase : ArcFile
+    internal abstract class PazArchiveBase : MultiFileArchive
     {
         public readonly int         Version;
         public readonly byte        XorKey;
 
         public PazArchiveBase (ArcView arc, ArchiveFormat impl, ICollection<Entry> dir, int version, byte key, IReadOnlyList<ArcView> parts = null)
-            : base (arc, impl, dir)
+            : base (arc, impl, dir, parts)
         {
             Version = version;
             XorKey = key;
-            m_parts = parts;
         }
 
-        IReadOnlyList<ArcView>  m_parts;
-
-        public IEnumerable<ArcView> Parts
+        protected override uint GetEntrySize (Entry entry)
         {
-            get
-            {
-                yield return File;
-                if (m_parts != null)
-                    foreach (var part in m_parts)
-                        yield return part;
-            }
+            var pent = entry as PazEntry;
+            if (pent != null)
+                return pent.AlignedSize;
+            else
+                return entry.Size;
         }
 
         internal abstract Stream DecryptEntry (Stream input, PazEntry entry);
-
-        bool _paz_disposed = false;
-        protected override void Dispose (bool disposing)
-        {
-            if (_paz_disposed)
-                return;
-
-            if (disposing && m_parts != null)
-            {
-                foreach (var arc in m_parts)
-                    arc.Dispose();
-            }
-            _paz_disposed = true;
-            base.Dispose (disposing);
-        }
     }
 
     internal class PazArchive : PazArchiveBase
@@ -152,12 +132,16 @@ namespace GameRes.Formats.Musica
         public override string         Tag { get { return "PAZ"; } }
         public override string Description { get { return "Musica engine resource archive"; } }
         public override uint     Signature { get { return 0; } }
-        public override bool  IsHierarchic { get { return false; } }
+        public override bool  IsHierarchic { get { return true; } }
         public override bool      CanWrite { get { return false; } }
 
         public PazOpener ()
         {
-            Signatures = new uint[] { 0x858F8493, 0x8F889395, 0x6E656465, 0x848F8486, 0 };
+            Extensions = new string[] { "paz", "dat" };
+            Signatures = new uint[] {
+                0x858F8493, 0x8F889395, 0x6E656465, 0x848F8486, 0x61657453, 0x6873616D, 0x92808483, 0
+            };
+            ContainedFormats = new string[] { "PNG", "ANI/PAZ", "SQZ", "OGG", "WAV", "TXT" };
         }
 
         static readonly ISet<string> AudioPazNames = new HashSet<string> {
@@ -167,11 +151,10 @@ namespace GameRes.Formats.Musica
 
         public override ArcFile TryOpen (ArcView file)
         {
-            if (!file.Name.HasExtension (".paz"))
-                return null;
             uint signature = file.View.ReadUInt32 (0);
-            // XXX encryption is queried for every .paz file
             var scheme = QueryEncryption (file.Name, signature);
+            if (null == scheme)
+                return null;
             uint start_offset = scheme.Version > 0 ? 0x20u : 0u;
             uint index_size = file.View.ReadUInt32 (start_offset);
             start_offset += 4;
@@ -290,32 +273,9 @@ namespace GameRes.Formats.Musica
             if (null == parc || null == pent)
                 return base.OpenEntry (arc, entry);
 
-            Stream input = null;
+            Stream input = parc.OpenStream (entry);
             try
             {
-                long part_offset = 0;
-                long entry_start = pent.Offset;
-                long entry_end   = pent.Offset + pent.AlignedSize;
-                foreach (var part in parc.Parts)
-                {
-                    long part_end_offset = part_offset + part.MaxOffset;
-                    if (entry_start < part_end_offset)
-                    {
-                        uint part_size = (uint)Math.Min (entry_end - entry_start, part_end_offset - entry_start);
-                        var entry_part = part.CreateStream (entry_start - part_offset, part_size);
-                        if (input != null)
-                            input = new ConcatStream (input, entry_part);
-                        else
-                            input = entry_part;
-                        entry_start += part_size;
-                        if (entry_start >= entry_end)
-                            break;
-                    }
-                    part_offset = part_end_offset;
-                }
-                if (null == input)
-                    return Stream.Null;
-
                 if (parc.XorKey != 0)
                     input = new XoredStream (input, parc.XorKey);
 
@@ -344,6 +304,8 @@ namespace GameRes.Formats.Musica
                 scheme = GetScheme (title);
                 if (null == scheme)
                 {
+                    if (!arc_name.HasExtension (".paz"))
+                        return null;
                     var options = Query<PazOptions> (arcStrings.ArcEncryptedNotice);
                     scheme = options.Scheme;
                 }

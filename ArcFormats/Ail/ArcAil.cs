@@ -31,6 +31,7 @@ using GameRes.Utility;
 namespace GameRes.Formats.Ail
 {
     [Export(typeof(ArchiveFormat))]
+    [ExportMetadata("Priority", -1)]
     public class DatOpener : ArchiveFormat
     {
         public override string         Tag { get { return "DAT/Ail"; } }
@@ -95,7 +96,7 @@ namespace GameRes.Formats.Ail
                 }
                 index_offset += 4;
             }
-            if (0 == dir.Count)
+            if (0 == dir.Count || (file.MaxOffset - offset) > 0x80000)
                 return null;
             DetectFileTypes (file, dir);
             return dir;
@@ -116,7 +117,7 @@ namespace GameRes.Formats.Ail
                     entry.IsPacked = true;
                     entry.UnpackedSize = file.View.ReadUInt32 (entry.Offset+2);
                 }
-                else if (0 == signature)
+                else if (0 == signature || file.View.AsciiEqual (entry.Offset+4, "OggS"))
                 {
                     extra = 4;
                 }
@@ -142,9 +143,17 @@ namespace GameRes.Formats.Ail
 
         static void SetEntryType (Entry entry, uint signature)
         {
-            var res = AutoEntry.DetectFileType (signature);
-            if (null != res)
-                entry.ChangeType (res);
+            if (0xBA010000 == signature)
+            {
+                entry.Type = "video";
+                entry.Name = Path.ChangeExtension (entry.Name, "mpg");
+            }
+            else
+            {
+                var res = AutoEntry.DetectFileType (signature);
+                if (null != res)
+                    entry.ChangeType (res);
+            }
         }
 
         /// <summary>
