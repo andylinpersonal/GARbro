@@ -452,8 +452,10 @@
                 <ScrollViewer Name="ImageView" Background="LightGray" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                               SizeChanged="PreviewSizeChanged">
                     <Image Name="ImageCanvas" Stretch="None" UseLayoutRounding="True" SnapsToDevicePixels="True"
-                           local:TouchScrolling.IsEnabled="True" RenderOptions.BitmapScalingMode="NearestNeighbor"
-                           Cursor="Images/Cursors/grab.cur" local:TouchScrolling.DraggingCursor="Images/Cursors/grabbing.cur" />
+                           local:TouchScrolling.IsEnabled="True" RenderOptions.BitmapScalingMode="HighQuality"
+                           Cursor="Images/Cursors/grab.cur" local:TouchScrolling.DraggingCursor="Images/Cursors/grabbing.cur"
+                           MouseWheel="ImageCanvas_MouseWheel"
+                           MouseLeftButtonDown="ImageCanvas_OnMouseLeftButtonDown"/>
                 </ScrollViewer>
                 <jv:TextViewer x:Name="TextView" Visibility="Collapsed" BorderThickness="1,0,0,0" BorderBrush="Black"/>
             </Grid>
@@ -527,7 +529,7 @@
     </Window.CommandBindings>
   <!--ADL-->
   <Window.TaskbarItemInfo>
-    <TaskbarItemInfo x:Name="TaskbarItemInfo" Description="Garbro" ProgressState="None">
+    <TaskbarItemInfo x:Name="GARBroTaskbarItemInfo" Description="GARBro" ProgressState="None">
       <TaskbarItemInfo.ThumbButtonInfos>
 
         <ThumbButtonInfo x:Name="TaskbarPreviousAudioControl"
