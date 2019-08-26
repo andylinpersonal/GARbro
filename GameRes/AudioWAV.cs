@@ -111,14 +111,24 @@ namespace GameRes
             0x0055, // MpegLayer3
         };
 
-        public override SoundInput TryOpen (IBinaryStream file)
+        public override SoundInput TryOpen(IBinaryStream file)
         {
-            var header = file.ReadHeader (0x16);
-            if (!header.AsciiEqual (8, "WAVE"))
+            var header = file.ReadHeader(0x16);
+            if (!header.AsciiEqual(8, "WAVE"))
                 return null;
-            ushort tag = header.ToUInt16 (0x14);
+            ushort tag = header.ToUInt16(0x14);
             if (0xFFFF == tag || 0x676F == tag || 0x6770 == tag || 0x674F == tag)
                 return null;
+            if (0x6750 == tag) // vorbis.acm??
+            {
+                file.Seek(0x2E, SeekOrigin.Begin);
+                byte[] ogg = file.ReadBytes((int) file.Length - 0x2E);
+                using (var mem = new BinMemoryStream(ogg))
+                {
+                    return Read(mem);
+                }
+            }
+
             file.Position = 0;
             SoundInput sound = new WaveInput (file.AsStream);
             if (EmbeddedFormats.Contains (sound.Format.FormatTag))
