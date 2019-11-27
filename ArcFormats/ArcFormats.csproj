@@ -100,6 +100,7 @@
     <Compile Include="AdvSys\ArcAdvSys3.cs" />
     <Compile Include="AdvSys\ImageGWD.cs" />
     <Compile Include="Ail\ArcLNK2.cs" />
+    <Compile Include="Alibi\ArcTAD.cs" />
     <Compile Include="BlueGale\ImageBBM.cs" />
     <Compile Include="JamCreation\ArcDAT.cs" />
     <Compile Include="JamCreation\ImageDPO.cs" />
