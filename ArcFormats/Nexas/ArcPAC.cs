@@ -42,6 +42,7 @@ namespace GameRes.Formats.NeXAS
         Huffman,
         Deflate,
         DeflateOrNone,
+        AiKissNone = 0x7
     }
 
     public class PacArchive : ArcFile
@@ -78,7 +79,7 @@ namespace GameRes.Formats.NeXAS
             if (null == dir)
                 return null;
 
-            if (Compression.None == reader.PackType)
+            if (Compression.None == reader.PackType || Compression.AiKissNone == reader.PackType)
                 return new ArcFile (file, this, dir);
             return new PacArchive (file, this, dir, reader.PackType);
         }

@@ -70,6 +70,13 @@
                       IsChecked="{Binding ElementName=AppWindow, Path=SortMode, Mode=OneWay, Converter={StaticResource sortModeToBooleanConverter}}"
                       Command="{x:Static local:Commands.SortBy}"/>
         </MenuItem>
+
+        <!-- Debug submenu-->
+        <!--<MenuItem x:Key="debugMenu" Header="{x:Static s:guiStrings.CtxMenuDebug}">
+            <MenuItem Header="{x:Static s:guiStrings.CtxMenuDebugCopyFolderContent}"
+                      Command="{x:Static local:Commands.DebugCopyFolderContent}" />
+        </MenuItem>-->
+
         <!-- Default listview context menu -->
         <ContextMenu x:Key="lvDirContextMenu">
             <MenuItem Header="{x:Static s:guiStrings.CtxMenuOpen}" InputGestureText="Enter"

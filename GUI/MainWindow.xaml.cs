@@ -1876,7 +1876,8 @@ namespace GARbro.GUI
         public static readonly RoutedCommand AudioPauseContinue = new RoutedCommand();
         public static readonly RoutedCommand AudioNext = new RoutedCommand();
         public static readonly RoutedCommand AudioPrevious = new RoutedCommand();
-#endregion
         public static readonly RoutedCommand ScaleImage = new RoutedCommand();
+        public static readonly RoutedCommand DebugCopyFolderContent = new RoutedCommand();
+#endregion
     }
 }

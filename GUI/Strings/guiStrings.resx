@@ -563,4 +563,10 @@ Overwrite?</value>
   <data name="winDownScaleImage" xml:space="preserve">
     <value>Scale large images to fit window</value>
   </data>
+  <data name="CtxMenuDebug" xml:space="preserve">
+    <value>_Debug</value>
+  </data>
+  <data name="CtxMenuDebugCopyFolderContent" xml:space="preserve">
+    <value>Copy &amp;Folder Contents</value>
+  </data>
 </root>
