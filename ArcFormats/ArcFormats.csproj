@@ -57,6 +57,9 @@
     </Reference>
     <Reference Include="NVorbis, Version=0.9.1.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\NVorbis.0.9.1\lib\net45\NVorbis.dll</HintPath>
+    <Reference Include="NVorbis, Version=0.8.6.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\NVorbis.0.8.6\lib\net35\NVorbis.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
@@ -65,9 +68,6 @@
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.IO.Compression" />
-    <Reference Include="System.IO.FileSystem">
-      <HintPath>..\packages\System.IO.FileSystem.4.3.0\lib\net46\System.IO.FileSystem.dll</HintPath>
-    </Reference>
     <Reference Include="System.Numerics" />
     <Reference Include="System.Security.Cryptography.Algorithms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Security.Cryptography.Algorithms.4.3.1\lib\net46\System.Security.Cryptography.Algorithms.dll</HintPath>
@@ -98,6 +98,7 @@
     <Compile Include="Abogado\ImageKG.cs" />
     <Compile Include="Actgs\ArcCG.cs" />
     <Compile Include="Actgs\ArcDAT.cs" />
+    <Compile Include="Ads\ArcPAC.cs" />
     <Compile Include="AdvDx\ArcPKD.cs" />
     <Compile Include="AdvScripter\ArcPAK.cs" />
     <Compile Include="AdvSys\ArcAdvSys3.cs" />
@@ -219,6 +220,7 @@
     <Compile Include="KiriKiri\YuzCrypt.cs" />
     <Compile Include="Lambda\ArcLAX.cs" />
     <Compile Include="Lambda\ImageCLS.cs" />
+    <Compile Include="Leaf\ArcAR2.cs" />
     <Compile Include="Leaf\ArcLEAF.cs" />
     <Compile Include="Leaf\ArcPAK.cs" />
     <Compile Include="Leaf\AudioP16.cs" />
@@ -332,6 +334,9 @@
     <Compile Include="Software House Parsley\ImagePCG.cs" />
     <Compile Include="Speed\ArcARC.cs" />
     <Compile Include="Stack\ArcGPK.cs" />
+    <Compile Include="Strikes\ArcPCK.cs" />
+    <Compile Include="Ads\ArcPOG.cs" />
+    <Compile Include="Strikes\ImageLAG.cs" />
     <Compile Include="StudioJikkenshitsu\ArcUMPK.cs" />
     <Compile Include="StudioJikkenshitsu\ImageDAT.cs" />
     <Compile Include="StudioJikkenshitsu\ImageGRC.cs" />

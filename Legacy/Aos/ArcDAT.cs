@@ -1,8 +1,8 @@
-//! \file       ArcMIK01.cs
-//! \date       2018 Jan 21
-//! \brief      MAIKA resource archive.
+//! \file       ArcDAT.cs
+//! \date       2019 Jun 06
+//! \brief      AOS engine resource archive.
 //
-// Copyright (C) 2018 by morkt
+// Copyright (C) 2019 by morkt
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to
@@ -28,45 +28,45 @@ using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.IO;
 
-namespace GameRes.Formats.Maika
+// [001124][emu] Luna Season ~150 Bun no 1 no Koibito~
+
+namespace GameRes.Formats.Aos
 {
     [Export(typeof(ArchiveFormat))]
-    public class MikOpener : Mk2Opener
+    public class DatOpener : ArchiveFormat
     {
-        public override string         Tag { get { return "DAT/MIK01"; } }
-        public override string Description { get { return "MAIKA resource archive"; } }
-        public override uint     Signature { get { return 0x304B494D; } } // 'MIK01'
+        public override string         Tag { get { return "DAT/PACK"; } }
+        public override string Description { get { return "AOS engine resource archive"; } }
+        public override uint     Signature { get { return 0; } }
         public override bool  IsHierarchic { get { return false; } }
         public override bool      CanWrite { get { return false; } }
 
-        public MikOpener ()
-        {
-            Signatures = new uint[] { 0x304B494D, 0x30475355 }; // 'MIK01', 'USG01'
-        }
-
         public override ArcFile TryOpen (ArcView file)
         {
-            if (!file.View.AsciiEqual (4, "1\x1A\0"))
+            if (!file.Name.HasExtension (".dat"))
                 return null;
-            int count = file.View.ReadInt16 (8);
-            if (!IsSaneCount (count))
+            var idx_name = VFS.ChangeFileName (file.Name, "index.idx");
+            if (!VFS.FileExists (idx_name))
                 return null;
-            uint index_offset = file.View.ReadUInt32 (0xA);
-            uint offset = 0x10;
-            var dir = new List<Entry> (count);
-            for (int i = 0; i < count; ++i)
+            using (var index = VFS.OpenBinaryStream (idx_name))
             {
-                var name = file.View.ReadString (index_offset, 0xC);
-                var entry = FormatCatalog.Instance.Create<Entry> (name);
-                entry.Offset = offset;
-                entry.Size = file.View.ReadUInt32 (index_offset+0xC);
-                if (!entry.CheckPlacement (file.MaxOffset))
+                var dir = new List<Entry>();
+                while (index.PeekByte() != -1)
+                {
+                    var name = index.ReadCString (0x34);
+                    if (string.IsNullOrEmpty (name))
+                        break;
+                    var entry = Create<Entry> (name);
+                    entry.Offset = index.ReadUInt32();
+                    entry.Size   = index.ReadUInt32();
+                    if (!entry.CheckPlacement (file.MaxOffset))
+                        return null;
+                    dir.Add (entry);
+                }
+                if (0 == dir.Count)
                     return null;
-                dir.Add (entry);
-                offset += entry.Size;
-                index_offset += 0x10;
+                return new ArcFile (file, this, dir);
             }
-            return GetArchive (file, dir);
         }
     }
 }
