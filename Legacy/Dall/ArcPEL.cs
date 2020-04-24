@@ -1,8 +1,8 @@
-//! \file       ArcMIK01.cs
-//! \date       2018 Jan 21
-//! \brief      MAIKA resource archive.
+//! \file       ArcPEL.cs
+//! \date       2019 May 28
+//! \brief      Dall resource archive.
 //
-// Copyright (C) 2018 by morkt
+// Copyright (C) 2019 by morkt
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to
@@ -28,45 +28,42 @@ using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.IO;
 
-namespace GameRes.Formats.Maika
+namespace GameRes.Formats.Dall
 {
     [Export(typeof(ArchiveFormat))]
-    public class MikOpener : Mk2Opener
+    public class PelOpener : ArchiveFormat
     {
-        public override string         Tag { get { return "DAT/MIK01"; } }
-        public override string Description { get { return "MAIKA resource archive"; } }
-        public override uint     Signature { get { return 0x304B494D; } } // 'MIK01'
+        public override string         Tag { get { return "PEL"; } }
+        public override string Description { get { return "Dall resource archive"; } }
+        public override uint     Signature { get { return 0; } }
         public override bool  IsHierarchic { get { return false; } }
         public override bool      CanWrite { get { return false; } }
 
-        public MikOpener ()
-        {
-            Signatures = new uint[] { 0x304B494D, 0x30475355 }; // 'MIK01', 'USG01'
-        }
-
         public override ArcFile TryOpen (ArcView file)
         {
-            if (!file.View.AsciiEqual (4, "1\x1A\0"))
+            if (!file.Name.HasExtension ("PEL"))
                 return null;
-            int count = file.View.ReadInt16 (8);
+            int count = file.View.ReadInt16 (0);
             if (!IsSaneCount (count))
                 return null;
-            uint index_offset = file.View.ReadUInt32 (0xA);
-            uint offset = 0x10;
-            var dir = new List<Entry> (count);
-            for (int i = 0; i < count; ++i)
+            using (var input = file.CreateStream())
             {
-                var name = file.View.ReadString (index_offset, 0xC);
-                var entry = FormatCatalog.Instance.Create<Entry> (name);
-                entry.Offset = offset;
-                entry.Size = file.View.ReadUInt32 (index_offset+0xC);
-                if (!entry.CheckPlacement (file.MaxOffset))
-                    return null;
-                dir.Add (entry);
-                offset += entry.Size;
-                index_offset += 0x10;
+                input.Position = 2;
+                var dir = new List<Entry> (count);
+                for (int i = 0; i < count; ++i)
+                {
+                    var name = input.ReadCString (0x14);
+                    uint size = input.ReadUInt32();
+                    var entry = Create<Entry> (name);
+                    entry.Offset = input.Position;
+                    entry.Size = size;
+                    if (!entry.CheckPlacement (file.MaxOffset))
+                        return null;
+                    dir.Add (entry);
+                    input.Seek (size, SeekOrigin.Current);
+                }
+                return new ArcFile (file, this, dir);
             }
-            return GetArchive (file, dir);
         }
     }
 }
